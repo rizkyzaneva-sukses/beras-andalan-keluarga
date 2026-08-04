@@ -28,9 +28,8 @@ RUN addgroup --system --gid 1001 nodejs && \
 COPY prisma ./prisma/
 COPY package.json package-lock.json ./
 RUN npm ci --omit=dev
-
-# Remove dev-only binaries to save space, keep prisma engine
-RUN rm -rf node_modules/.package-lock.json
+# Allow nextjs user to modify prisma client at runtime (db push)
+RUN chown -R nextjs:nodejs /app/node_modules/.prisma
 
 COPY --from=builder /app/public ./public
 COPY --from=builder /app/.next/standalone ./
