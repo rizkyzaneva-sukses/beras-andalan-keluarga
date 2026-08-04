@@ -1,0 +1,52 @@
+export type UserRole = "OWNER" | "KASIR";
+export type MetodeBayar = "CASH" | "TRANSFER" | "QRIS";
+export type KategoriPembelanjaan = "RESTOCK" | "OPERASIONAL" | "LAINNYA";
+
+export interface Product {
+  id: string;
+  nama: string;
+  satuan: string;
+  hargaBeli: number;
+  hargaJual: number;
+  aktif: boolean;
+}
+
+export interface ModalEntry {
+  id: string;
+  jumlah: number;
+  tanggal: string;
+  keterangan: string | null;
+  createdBy: string;
+}
+
+export interface PembelanjaanEntry {
+  id: string;
+  tanggal: string;
+  kategori: KategoriPembelanjaan;
+  namaBarang: string;
+  jumlah: number;
+  harga: number;
+  total: number;
+  createdBy: string;
+}
+
+export interface PenjualanEntry {
+  id: string;
+  tanggal: string;
+  produkId: string;
+  produkNama?: string;
+  qty: number;
+  hargaJual: number;
+  total: number;
+  metodeBayar: MetodeBayar;
+  hargaDisesuaikan: boolean;
+  createdBy: string;
+}
+
+export interface LaporanSummary {
+  totalPendapatan: number;
+  totalPengeluaran: number;
+  labaRugi: number;
+  totalModal: number;
+  saldoKas: number;
+}

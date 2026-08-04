@@ -1,0 +1,116 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  OWNER
+  KASIR
+}
+
+enum KategoriPembelanjaan {
+  RESTOCK
+  OPERASIONAL
+  LAINNYA
+}
+
+enum MetodeBayar {
+  CASH
+  TRANSFER
+  QRIS
+}
+
+model User {
+  id           String   @id @default(cuid())
+  username     String   @unique
+  passwordHash String   @map("password_hash")
+  role         Role
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  penjualan     Penjualan[]
+  pembelanjaan  Pembelanjaan[]
+  modalLog      ModalLog[]
+  auditLog      AuditLog[]
+
+  @@map("user")
+}
+
+model Produk {
+  id        String   @id @default(cuid())
+  nama      String
+  satuan    String
+  hargaBeli Int      @map("harga_beli")
+  hargaJual Int      @map("harga_jual")
+  aktif     Boolean  @default(true)
+  createdAt DateTime @default(now()) @map("created_at")
+
+  penjualan Penjualan[]
+
+  @@map("produk")
+}
+
+model ModalLog {
+  id         String   @id @default(cuid())
+  jumlah     Int
+  tanggal    DateTime
+  keterangan String?
+  createdBy  String   @map("created_by")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [createdBy], references: [id])
+
+  @@map("modal_log")
+}
+
+model Pembelanjaan {
+  id         String               @id @default(cuid())
+  tanggal    DateTime
+  kategori   KategoriPembelanjaan
+  namaBarang String               @map("nama_barang")
+  jumlah     Int
+  harga      Int
+  total      Int
+  createdBy  String               @map("created_by")
+  createdAt  DateTime             @default(now()) @map("created_at")
+
+  user User @relation(fields: [createdBy], references: [id])
+
+  @@map("pembelanjaan")
+}
+
+model Penjualan {
+  id                String      @id @default(cuid())
+  tanggal           DateTime
+  produkId          String      @map("produk_id")
+  qty               Int
+  hargaJual         Int         @map("harga_jual")
+  total             Int
+  metodeBayar       MetodeBayar @map("metode_bayar")
+  hargaDisesuaikan  Boolean     @default(false) @map("harga_disesuaikan")
+  createdBy         String      @map("created_by")
+  createdAt         DateTime    @default(now()) @map("created_at")
+
+  produk Produk @relation(fields: [produkId], references: [id])
+  user   User   @relation(fields: [createdBy], references: [id])
+
+  @@map("penjualan")
+}
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  entityType String   @map("entity_type")
+  entityId   String   @map("entity_id")
+  action     String
+  oldData    String?  @map("old_data")
+  newData    String?  @map("new_data")
+  userId     String   @map("user_id")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@map("audit_log")
+}
