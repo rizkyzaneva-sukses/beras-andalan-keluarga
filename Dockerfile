@@ -24,13 +24,13 @@ RUN apk add --no-cache openssl
 RUN addgroup --system --gid 1001 nodejs && \
     adduser --system --uid 1001 nextjs
 
+# Install production deps + prisma for db push
+COPY package.json package-lock.json ./
+RUN npm ci --omit=dev && npx prisma generate
+
 COPY --from=builder /app/public ./public
 COPY --from=builder /app/.next/standalone ./
 COPY --from=builder /app/.next/static ./.next/static
-COPY --from=deps /app/node_modules/.prisma ./node_modules/.prisma
-COPY --from=deps /app/node_modules/@prisma ./node_modules/@prisma
-COPY --from=deps /app/node_modules/tsx ./node_modules/tsx
-COPY --from=deps /app/node_modules/typescript ./node_modules/typescript
 COPY prisma ./prisma/
 COPY start.sh ./
 RUN chmod +x start.sh
