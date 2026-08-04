@@ -26,6 +26,6 @@ export async function POST(request: NextRequest) {
   session.role = user.role;
   await session.save();
 
-  const redirectTo = user.role === "KASIR" ? "/penjualan" : "/dashboard";
+  const redirectTo = user.role === "KASIR" ? "/pos" : "/dashboard";
   return NextResponse.json({ success: true, redirectTo });
 }
