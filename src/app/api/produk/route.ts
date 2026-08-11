@@ -4,7 +4,7 @@ import { getSession } from "@/lib/session";
 
 export async function GET() {
   const session = await getSession();
-  if (!session.userId || session.role !== "OWNER") {
+  if (!session.userId) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
   }
 
