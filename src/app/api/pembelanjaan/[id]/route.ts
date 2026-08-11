@@ -13,6 +13,9 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
   if (!oldRecord) return NextResponse.json({ error: "Data tidak ditemukan" }, { status: 404 });
 
   const { tanggal, kategori, namaBarang, jumlah, harga, total, statusBayar } = await request.json();
+  if (!Number.isInteger(jumlah) || jumlah <= 0 || !Number.isInteger(harga) || harga <= 0 || total !== jumlah * harga) {
+    return NextResponse.json({ error: "Perhitungan pengeluaran tidak valid" }, { status: 400 });
+  }
 
   const newRecord = await prisma.pembelanjaan.update({
     where: { id },

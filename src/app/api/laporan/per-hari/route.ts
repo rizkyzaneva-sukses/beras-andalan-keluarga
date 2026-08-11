@@ -16,14 +16,14 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "Rentang tanggal wajib diisi" }, { status: 400 });
   }
 
-  const dateFrom = new Date(from);
-  dateFrom.setDate(dateFrom.getDate() - 1);
-  const dateTo = new Date(to);
-  dateTo.setDate(dateTo.getDate() + 1);
+  const dateFrom = new Date(`${from}T00:00:00.000Z`);
+  const dateToExclusive = new Date(`${to}T00:00:00.000Z`);
+  dateToExclusive.setUTCDate(dateToExclusive.getUTCDate() + 1);
 
-  const [penjualan, pembelanjaan] = await Promise.all([
-    prisma.penjualan.findMany({ where: { tanggal: { gte: dateFrom, lte: dateTo } }, orderBy: { tanggal: "asc" } }),
-    prisma.pembelanjaan.findMany({ where: { tanggal: { gte: dateFrom, lte: dateTo } }, orderBy: { tanggal: "asc" } }),
+  const [penjualan, pembelanjaan, pembayaranUtang] = await Promise.all([
+    prisma.penjualan.findMany({ where: { tanggal: { gte: dateFrom, lt: dateToExclusive } }, orderBy: { tanggal: "asc" } }),
+    prisma.pembelanjaan.findMany({ where: { tanggal: { gte: dateFrom, lt: dateToExclusive }, statusBayar: "CASH" }, orderBy: { tanggal: "asc" } }),
+    prisma.pembayaranUtang.findMany({ where: { tanggal: { gte: dateFrom, lt: dateToExclusive } }, orderBy: { tanggal: "asc" } }),
   ]);
 
   const dayMap = new Map<string, { pendapatan: number; pengeluaran: number }>();
@@ -39,6 +39,13 @@ export async function GET(request: NextRequest) {
     const d = p.tanggal.toISOString().slice(0, 10);
     const entry = dayMap.get(d) || { pendapatan: 0, pengeluaran: 0 };
     entry.pengeluaran += p.total;
+    dayMap.set(d, entry);
+  }
+
+  for (const p of pembayaranUtang) {
+    const d = p.tanggal.toISOString().slice(0, 10);
+    const entry = dayMap.get(d) || { pendapatan: 0, pengeluaran: 0 };
+    entry.pengeluaran += p.jumlah;
     dayMap.set(d, entry);
   }
 

@@ -13,14 +13,13 @@ export async function GET(request: NextRequest) {
   if (!from || !to) {
     return NextResponse.json({ error: "Rentang tanggal wajib diisi" }, { status: 400 });
   }
-  const fromDate = new Date(from);
-  fromDate.setDate(fromDate.getDate() - 1);
-  const toDate = new Date(to);
-  toDate.setDate(toDate.getDate() + 1);
+  const fromDate = new Date(`${from}T00:00:00.000Z`);
+  const toDateExclusive = new Date(`${to}T00:00:00.000Z`);
+  toDateExclusive.setUTCDate(toDateExclusive.getUTCDate() + 1);
 
   const users = await prisma.user.findMany({ where: { isActive: true }, select: { id: true, username: true, role: true } });
   const penjualan = await prisma.penjualan.findMany({
-    where: { tanggal: { gte: fromDate, lte: toDate } },
+    where: { tanggal: { gte: fromDate, lt: toDateExclusive } },
     select: { createdBy: true, metodeBayar: true, total: true },
   });
 
