@@ -27,7 +27,7 @@ export default function UtangPage() {
   const kategoriLabel: Record<string, string> = { RESTOCK: "Restock", OPERASIONAL: "Operasional", LAINNYA: "Lainnya" };
 
   return (
-    <div className="max-w-lg mx-auto space-y-4">
+    <div className="page-wrap space-y-4">
       <h2 className="text-lg font-bold">Utang</h2>
 
       <div className="bg-red-50 border border-red-200 rounded-xl p-4 text-center shadow-sm">

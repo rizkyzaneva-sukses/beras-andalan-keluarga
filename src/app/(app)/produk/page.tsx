@@ -29,10 +29,13 @@ export default function ProdukPage() {
   async function handleDelete(id: string) { if (!confirm("Hapus produk ini?")) return; await fetch(`/api/produk/${id}`, { method: "DELETE" }); fetchProduk(); }
 
   return (
-    <div className="max-w-lg mx-auto space-y-4">
-      <div className="flex justify-between items-center">
-        <h2 className="text-lg font-bold">Master Produk</h2>
-        <button onClick={openAdd} className="bg-primary text-white px-4 py-2.5 rounded-lg text-sm font-medium hover:bg-primary-hover active:bg-primary-hover/80 transition-colors shadow-sm">+ Tambah</button>
+    <div className="page-wrap space-y-4">
+      <div className="flex justify-between items-center gap-3">
+        <div>
+          <h2 className="text-xl font-bold tracking-tight">Master Produk</h2>
+          <p className="text-sm text-muted-foreground">Harga, satuan & stok beras</p>
+        </div>
+        <button onClick={openAdd} className="btn-primary px-4 py-2.5 text-sm shrink-0">+ Tambah</button>
       </div>
 
       {showForm && (
@@ -54,15 +57,16 @@ export default function ProdukPage() {
 
       {loading ? (<div className="text-center py-10"><div className="inline-block w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin" /><p className="text-muted-foreground text-sm mt-2">Memuat...</p></div>)
       : produk.length === 0 ? (<div className="text-center py-10 bg-white border border-dashed border-border rounded-xl"><p className="text-muted-foreground text-sm">Belum ada produk</p></div>)
-      : (<div className="space-y-2">{produk.map((p) => (
-            <div key={p.id} className="bg-white border border-border rounded-xl p-3 flex items-center justify-between shadow-sm">
-              <div className="min-w-0 flex-1 mr-2">
-                <p className="font-medium text-[15px] truncate">{p.nama}</p>
-                <p className="text-xs text-muted-foreground mt-0.5">Beli: Rp {p.hargaBeli.toLocaleString("id-ID")} / Jual: Rp {p.hargaJual.toLocaleString("id-ID")} &middot; {p.satuan}</p>
+      : (<div className="grid sm:grid-cols-2 gap-2">{produk.map((p) => (
+            <div key={p.id} className="card-surface p-3.5 flex items-center justify-between gap-2">
+              <div className="min-w-0 flex-1">
+                <p className="font-semibold text-[15px] truncate">{p.nama}</p>
+                <p className="text-xs text-muted-foreground mt-1">Jual Rp {p.hargaJual.toLocaleString("id-ID")} · Beli Rp {p.hargaBeli.toLocaleString("id-ID")} · {p.satuan}</p>
+                <p className={`text-xs font-semibold mt-1.5 ${(p.stok ?? 0) <= 0 ? "text-danger" : (p.stok ?? 0) < 10 ? "text-warning" : "text-primary"}`}>Stok: {p.stok ?? 0}</p>
               </div>
-              <div className="flex flex-col gap-0.5 shrink-0">
-                <button onClick={() => openEdit(p)} className="px-2.5 py-1 text-xs text-primary font-medium hover:bg-primary/10 rounded transition-colors">Edit</button>
-                <button onClick={() => handleDelete(p.id)} className="px-2.5 py-1 text-xs text-danger font-medium hover:bg-red-50 rounded transition-colors">Hapus</button>
+              <div className="flex flex-col gap-1 shrink-0">
+                <button onClick={() => openEdit(p)} className="px-3 py-1.5 text-xs text-primary font-semibold hover:bg-primary-soft rounded-lg transition-colors">Edit</button>
+                <button onClick={() => handleDelete(p.id)} className="px-3 py-1.5 text-xs text-danger font-semibold hover:bg-danger-soft rounded-lg transition-colors">Hapus</button>
               </div>
             </div>
           ))}</div>)}

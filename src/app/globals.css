@@ -1,41 +1,73 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
-  --primary: #16a34a;
-  --primary-hover: #15803d;
+  --background: #f4f7f5;
+  --foreground: #0f1f14;
+  --surface: #ffffff;
+  --primary: #15803d;
+  --primary-hover: #166534;
+  --primary-soft: #dcfce7;
   --danger: #dc2626;
   --danger-hover: #b91c1c;
-  --muted: #f3f4f6;
-  --muted-foreground: #6b7280;
-  --border: #e5e7eb;
-  --radius: 0.5rem;
+  --danger-soft: #fee2e2;
+  --warning: #d97706;
+  --warning-soft: #fef3c7;
+  --muted: #eef2ef;
+  --muted-foreground: #5b6b60;
+  --border: #d8e2db;
+  --ring: #22c55e;
+  --radius: 0.875rem;
+  --shadow-sm: 0 1px 2px rgb(15 31 20 / 0.04);
+  --shadow: 0 4px 16px rgb(15 31 20 / 0.06);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-top: env(safe-area-inset-top, 0px);
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
+  --color-surface: var(--surface);
   --color-primary: var(--primary);
   --color-primary-hover: var(--primary-hover);
+  --color-primary-soft: var(--primary-soft);
   --color-danger: var(--danger);
   --color-danger-hover: var(--danger-hover);
+  --color-danger-soft: var(--danger-soft);
+  --color-warning: var(--warning);
+  --color-warning-soft: var(--warning-soft);
   --color-muted: var(--muted);
   --color-muted-foreground: var(--muted-foreground);
   --color-border: var(--border);
+  --color-ring: var(--ring);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
+  --radius-xl: var(--radius);
+}
+
+* {
+  -webkit-tap-highlight-color: transparent;
+}
+
+html {
+  height: 100%;
+  scroll-behavior: smooth;
 }
 
 body {
+  min-height: 100%;
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-geist-sans), system-ui, sans-serif;
+  text-rendering: optimizeLegibility;
 }
 
 @layer base {
-  input, select, textarea, button {
+  input,
+  select,
+  textarea,
+  button {
     font-size: 16px;
+    font-family: inherit;
   }
 
   input[type="number"] {
@@ -46,5 +78,82 @@ body {
   input::-webkit-inner-spin-button {
     -webkit-appearance: none;
     margin: 0;
+  }
+}
+
+@layer utilities {
+  .scrollbar-none {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  .scrollbar-none::-webkit-scrollbar {
+    display: none;
+  }
+
+  .safe-pb {
+    padding-bottom: calc(1rem + var(--safe-bottom));
+  }
+
+  .touch-target {
+    min-height: 44px;
+    min-width: 44px;
+  }
+
+  .card-surface {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow-sm);
+  }
+
+  .btn-primary {
+    background: var(--primary);
+    color: white;
+    font-weight: 600;
+    border-radius: calc(var(--radius) - 2px);
+    transition: background 0.15s ease, transform 0.1s ease;
+  }
+  .btn-primary:hover {
+    background: var(--primary-hover);
+  }
+  .btn-primary:active {
+    transform: scale(0.98);
+  }
+  .btn-primary:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+    transform: none;
+  }
+
+  .input-field {
+    width: 100%;
+    border: 1px solid var(--border);
+    border-radius: calc(var(--radius) - 2px);
+    background: var(--surface);
+    padding: 0.7rem 0.85rem;
+    outline: none;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  }
+  .input-field:focus {
+    border-color: var(--ring);
+    box-shadow: 0 0 0 3px rgb(34 197 94 / 0.18);
+  }
+
+  .page-wrap {
+    width: 100%;
+    max-width: 42rem;
+    margin-inline: auto;
+  }
+
+  @media (min-width: 768px) {
+    .page-wrap {
+      max-width: 48rem;
+    }
+  }
+
+  @media (min-width: 1024px) {
+    .page-wrap {
+      max-width: 56rem;
+    }
   }
 }

@@ -50,7 +50,7 @@ export default function ClosingPage() {
   const tglIndo = new Date().toLocaleDateString("id-ID", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
 
   return (
-    <div className="max-w-lg mx-auto space-y-4">
+    <div className="page-wrap space-y-4">
       <h2 className="text-lg font-bold">Closing Harian</h2>
       <p className="text-sm text-muted-foreground -mt-2">{tglIndo}</p>
 

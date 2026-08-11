@@ -66,40 +66,42 @@ export default function DashboardPage() {
   const rangeLabels: Record<RangeKey, string> = { today: "Hari Ini", week: "Minggu Ini", month: "Bulan Ini", custom: "Custom" };
 
   return (
-    <div className="max-w-lg mx-auto space-y-4">
-      <h2 className="text-lg font-bold">Dashboard</h2>
+    <div className="page-wrap space-y-4">
+      <div>
+        <h2 className="text-xl font-bold tracking-tight">Dashboard</h2>
+        <p className="text-sm text-muted-foreground mt-0.5">Ringkasan kas & laba/rugi</p>
+      </div>
 
       <div className="flex flex-wrap gap-1.5">
         {(Object.keys(rangeLabels) as RangeKey[]).map((r) => (
-          <button key={r} onClick={() => setRange(r)} className={`px-3.5 py-2 rounded-lg text-[13px] font-medium transition-colors ${range === r ? "bg-primary text-white shadow-sm" : "bg-white border border-border text-muted-foreground hover:bg-muted active:bg-border"}`}>{rangeLabels[r]}</button>
+          <button key={r} onClick={() => setRange(r)} className={`px-3.5 py-2.5 rounded-xl text-[13px] font-semibold transition-colors min-h-[40px] ${range === r ? "bg-primary text-white shadow-sm" : "bg-surface border border-border text-muted-foreground hover:bg-muted active:bg-border"}`}>{rangeLabels[r]}</button>
         ))}
       </div>
 
       {range === "custom" && (
         <div className="flex gap-2 items-center">
-          <input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} className="border border-border rounded-lg px-3 py-2.5 text-sm flex-1 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary" />
+          <input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} className="input-field text-sm flex-1" />
           <span className="text-muted-foreground text-sm">s/d</span>
-          <input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} className="border border-border rounded-lg px-3 py-2.5 text-sm flex-1 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary" />
+          <input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} className="input-field text-sm flex-1" />
         </div>
       )}
 
       {loading ? (
-        <div className="text-center py-10"><div className="inline-block w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin" /><p className="text-muted-foreground text-sm mt-2">Memuat data...</p></div>
+        <div className="text-center py-12"><div className="inline-block w-8 h-8 border-[3px] border-primary border-t-transparent rounded-full animate-spin" /><p className="text-muted-foreground text-sm mt-3">Memuat data...</p></div>
       ) : summary ? (
         <div className="space-y-3">
-          <div className="grid grid-cols-2 gap-3">
-            <div className="bg-green-50 border border-green-200 rounded-xl p-4 shadow-sm"><p className="text-[11px] text-green-700 font-medium uppercase tracking-wide">Pendapatan</p><p className="text-lg font-bold text-green-800 font-mono mt-0.5 leading-tight">{formatRupiah(summary.totalPendapatan)}</p></div>
-            <div className="bg-red-50 border border-red-200 rounded-xl p-4 shadow-sm"><p className="text-[11px] text-red-700 font-medium uppercase tracking-wide">Pengeluaran</p><p className="text-lg font-bold text-red-800 font-mono mt-0.5 leading-tight">{formatRupiah(summary.totalPengeluaran)}</p></div>
-          </div>
-
-          <div className={`border rounded-xl p-4 text-center shadow-sm ${summary.labaRugi >= 0 ? "bg-green-50 border-green-300" : "bg-red-50 border-red-300"}`}>
-            <p className="text-sm font-semibold">{summary.labaRugi >= 0 ? "Laba Bersih" : "Rugi"}</p>
-            <p className={`text-2xl font-bold font-mono mt-1 ${summary.labaRugi >= 0 ? "text-green-800" : "text-red-800"}`}>{formatRupiah(Math.abs(summary.labaRugi))}</p>
-          </div>
-
-          <div className="bg-white border border-border rounded-xl p-3.5 text-sm space-y-2 shadow-sm">
-            <div className="flex justify-between"><span className="text-muted-foreground">Total Modal</span><span className="font-mono font-medium">{formatRupiah(summary.totalModal)}</span></div>
-            <div className="border-t border-border pt-2 flex justify-between"><span className="text-muted-foreground">Saldo Kas Saat Ini</span><span className="font-mono font-bold text-primary">{formatRupiah(summary.saldoKas)}</span></div>
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+            <div className="card-surface p-4 bg-primary-soft/40 border-primary/15"><p className="text-[11px] text-primary font-semibold uppercase tracking-wide">Pendapatan</p><p className="text-lg font-bold text-primary font-mono mt-1 leading-tight">{formatRupiah(summary.totalPendapatan)}</p></div>
+            <div className="card-surface p-4 bg-danger-soft/50 border-danger/15"><p className="text-[11px] text-danger font-semibold uppercase tracking-wide">Pengeluaran</p><p className="text-lg font-bold text-danger font-mono mt-1 leading-tight">{formatRupiah(summary.totalPengeluaran)}</p></div>
+            <div className={`card-surface p-4 col-span-2 lg:col-span-1 ${summary.labaRugi >= 0 ? "bg-primary-soft/30 border-primary/20" : "bg-danger-soft/40 border-danger/20"}`}>
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">{summary.labaRugi >= 0 ? "Laba Bersih" : "Rugi"}</p>
+              <p className={`text-xl font-bold font-mono mt-1 ${summary.labaRugi >= 0 ? "text-primary" : "text-danger"}`}>{formatRupiah(Math.abs(summary.labaRugi))}</p>
+            </div>
+            <div className="card-surface p-4 col-span-2 lg:col-span-1">
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Saldo Kas</p>
+              <p className="text-xl font-bold font-mono mt-1 text-foreground">{formatRupiah(summary.saldoKas)}</p>
+              <p className="text-xs text-muted-foreground mt-1">Modal {formatRupiah(summary.totalModal)}</p>
+            </div>
           </div>
 
           <div>
@@ -110,7 +112,7 @@ export default function DashboardPage() {
             {detailTab === "penjualan" ? (
               penjualan.length === 0 ? <p className="text-muted-foreground text-center py-6 text-sm">Belum ada penjualan di periode ini</p>
               : <div className="space-y-2">{penjualan.map((p) => (
-                <div key={p.id} className="bg-white border border-border rounded-xl p-3 shadow-sm">
+                <div key={p.id} className="card-surface p-3">
                   <div className="flex justify-between items-start">
                     <div className="min-w-0 flex-1 mr-2"><p className="font-medium text-[15px] truncate">{p.produkNama || p.produkId}</p><p className="text-xs text-muted-foreground mt-0.5">{p.qty} &times; {formatRupiah(p.hargaJual)} &middot; {p.metodeBayar === "CASH" ? "Tunai" : p.metodeBayar === "QRIS" ? "QRIS" : "Transfer"}</p></div>
                     <div className="text-right shrink-0"><p className="font-mono font-bold text-[15px]">{formatRupiah(p.total)}</p><p className="text-[11px] text-muted-foreground">{new Date(p.tanggal).toLocaleDateString("id-ID", { day: "numeric", month: "short" })}</p></div>
@@ -121,7 +123,7 @@ export default function DashboardPage() {
             ) : (
               pembelanjaan.length === 0 ? <p className="text-muted-foreground text-center py-6 text-sm">Belum ada pengeluaran di periode ini</p>
               : <div className="space-y-2">{pembelanjaan.map((p) => (
-                <div key={p.id} className="bg-white border border-border rounded-xl p-3 shadow-sm">
+                <div key={p.id} className="card-surface p-3">
                   <div className="flex justify-between items-start">
                     <div className="min-w-0 flex-1 mr-2"><p className="font-medium text-[15px] truncate">{p.namaBarang}</p>
                       <div className="flex flex-wrap gap-x-2 gap-y-0.5 text-xs text-muted-foreground mt-0.5"><span className="text-[11px]">{p.kategori === "RESTOCK" ? "Restock" : p.kategori === "OPERASIONAL" ? "Operasional" : "Lainnya"}</span><span>{p.jumlah} &times; {formatRupiah(p.harga)}</span></div>

@@ -76,7 +76,7 @@ export default function PembelanjaanPage() {
   const total = data.reduce((s, p) => s + p.total, 0);
 
   return (
-    <div className="max-w-lg mx-auto space-y-4">
+    <div className="page-wrap space-y-4">
       <div className="flex justify-between items-center">
         <h2 className="text-lg font-bold">Pengeluaran</h2>
         <button onClick={openAdd} className="bg-primary text-white px-4 py-2.5 rounded-lg text-sm font-medium hover:bg-primary-hover active:bg-primary-hover/80 transition-colors shadow-sm">+ Tambah</button>

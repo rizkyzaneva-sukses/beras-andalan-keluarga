@@ -47,7 +47,7 @@ export default function AuditPage() {
   }
 
   return (
-    <div className="max-w-lg mx-auto space-y-4">
+    <div className="page-wrap space-y-4">
       <h2 className="text-lg font-bold">Audit Trail</h2>
 
       {loading ? (
