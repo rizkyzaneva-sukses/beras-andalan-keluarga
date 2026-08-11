@@ -8,6 +8,8 @@ export interface Product {
   satuan: string;
   hargaBeli: number;
   hargaJual: number;
+  stok: number;
+  hppRataRata: number;
   aktif: boolean;
 }
 
@@ -27,6 +29,7 @@ export interface PembelanjaanEntry {
   jumlah: number;
   harga: number;
   total: number;
+  statusBayar: "CASH" | "KREDIT";
   createdBy: string;
 }
 

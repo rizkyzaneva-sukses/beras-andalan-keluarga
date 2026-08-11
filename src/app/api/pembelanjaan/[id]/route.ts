@@ -12,14 +12,22 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
   const oldRecord = await prisma.pembelanjaan.findUnique({ where: { id } });
   if (!oldRecord) return NextResponse.json({ error: "Data tidak ditemukan" }, { status: 404 });
 
-  const { tanggal, kategori, namaBarang, jumlah, harga, total } = await request.json();
+  const { tanggal, kategori, namaBarang, jumlah, harga, total, statusBayar } = await request.json();
 
   const newRecord = await prisma.pembelanjaan.update({
     where: { id },
-    data: { tanggal: new Date(tanggal), kategori, namaBarang, jumlah, harga, total },
+    data: {
+      tanggal: new Date(tanggal),
+      kategori,
+      namaBarang,
+      jumlah,
+      harga,
+      total,
+      statusBayar: statusBayar || oldRecord.statusBayar,
+    },
   });
 
-  const fieldsToLog = ["tanggal", "kategori", "namaBarang", "jumlah", "harga", "total"];
+  const fieldsToLog = ["tanggal", "kategori", "namaBarang", "jumlah", "harga", "total", "statusBayar"];
   const oldData: Record<string, unknown> = {};
   const newData: Record<string, unknown> = {};
   let hasChanges = false;
@@ -77,6 +85,9 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
     },
   });
 
+  await prisma.pembayaranUtang.deleteMany({ where: { pembelanjaanId: id } });
+
   await prisma.pembelanjaan.delete({ where: { id } });
+
   return NextResponse.json({ success: true });
 }

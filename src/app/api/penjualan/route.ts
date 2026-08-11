@@ -66,5 +66,8 @@ export async function POST(request: NextRequest) {
       createdBy: session.userId,
     },
   });
+
+  await prisma.produk.update({ where: { id: produkId }, data: { stok: { decrement: qty } } }).catch(() => {});
+
   return NextResponse.json(penjualan, { status: 201 });
 }

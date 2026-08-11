@@ -10,7 +10,7 @@ export default function PembelanjaanPage() {
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
-  const [form, setForm] = useState({ tanggal: new Date().toISOString().slice(0, 10), kategori: "RESTOCK" as KategoriPembelanjaan, namaBarang: "", jumlah: "", harga: "" });
+  const [form, setForm] = useState({ tanggal: new Date().toISOString().slice(0, 10), kategori: "RESTOCK" as KategoriPembelanjaan, namaBarang: "", jumlah: "", harga: "", statusBayar: "CASH" as "CASH" | "KREDIT" });
   const [error, setError] = useState("");
   const [range, setRange] = useState<RangeKey>("today");
   const [dateFrom, setDateFrom] = useState(new Date().toISOString().slice(0, 10));
@@ -48,12 +48,12 @@ export default function PembelanjaanPage() {
   }
 
   function openAdd() {
-    setEditId(null); setForm({ tanggal: new Date().toISOString().slice(0, 10), kategori: "RESTOCK", namaBarang: "", jumlah: "", harga: "" });
+    setEditId(null); setForm({ tanggal: new Date().toISOString().slice(0, 10), kategori: "RESTOCK", namaBarang: "", jumlah: "", harga: "", statusBayar: "CASH" });
     setShowForm(true); setError(""); setSuggestions([]); setShowSuggest(false);
   }
 
   function openEdit(p: PembelanjaanEntry) {
-    setEditId(p.id); setForm({ tanggal: p.tanggal.slice(0, 10), kategori: p.kategori, namaBarang: p.namaBarang, jumlah: String(p.jumlah), harga: String(p.harga) });
+    setEditId(p.id); setForm({ tanggal: p.tanggal.slice(0, 10), kategori: p.kategori, namaBarang: p.namaBarang, jumlah: String(p.jumlah), harga: String(p.harga), statusBayar: p.statusBayar });
     setShowForm(true); setError(""); setSuggestions([]); setShowSuggest(false);
   }
 
@@ -106,6 +106,12 @@ export default function PembelanjaanPage() {
           <h3 className="font-semibold text-[15px]">{editId ? "Edit Pengeluaran" : "Tambah Pengeluaran"}</h3>
           <div><label className="block text-sm font-medium mb-1">Tanggal</label><input type="date" value={form.tanggal} onChange={(e) => setForm({ ...form, tanggal: e.target.value })} required className="w-full px-3 py-2.5 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary" /></div>
           <div><label className="block text-sm font-medium mb-1">Kategori</label><select value={form.kategori} onChange={(e) => setForm({ ...form, kategori: e.target.value as KategoriPembelanjaan })} className="w-full px-3 py-2.5 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary bg-white"><option value="RESTOCK">Restock Beras</option><option value="OPERASIONAL">Operasional</option><option value="LAINNYA">Lainnya</option></select></div>
+          <div><label className="block text-sm font-medium mb-1">Status Bayar</label>
+            <div className="flex gap-2">
+              <button type="button" onClick={() => setForm({ ...form, statusBayar: "CASH" })} className={`flex-1 py-2.5 rounded-lg text-sm font-medium border transition-colors ${form.statusBayar === "CASH" ? "bg-green-600 text-white border-green-600 shadow-sm" : "border-border text-muted-foreground hover:bg-muted active:bg-border"}`}>Cash</button>
+              <button type="button" onClick={() => setForm({ ...form, statusBayar: "KREDIT" })} className={`flex-1 py-2.5 rounded-lg text-sm font-medium border transition-colors ${form.statusBayar === "KREDIT" ? "bg-amber-600 text-white border-amber-600 shadow-sm" : "border-border text-muted-foreground hover:bg-muted active:bg-border"}`}>Kredit</button>
+            </div>
+          </div>
           <div className="relative">
             <label className="block text-sm font-medium mb-1">Nama Barang/Biaya</label>
             <input type="text" value={form.namaBarang} onChange={(e) => { setForm({ ...form, namaBarang: e.target.value }); fetchSuggestions(e.target.value); }} onFocus={() => { if (suggestions.length > 0) setShowSuggest(true); }} onBlur={() => setTimeout(() => setShowSuggest(false), 200)} required className="w-full px-3 py-2.5 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary" placeholder="Ketik nama, pilih dari history atau tulis baru" />
@@ -139,6 +145,7 @@ export default function PembelanjaanPage() {
               <p className="font-medium text-[15px]">{p.namaBarang}</p>
               <div className="flex flex-wrap gap-x-2 gap-y-0.5 text-xs text-muted-foreground mt-0.5">
                 <span className="px-1.5 py-0.5 bg-muted rounded text-[11px] font-medium">{kategoryLabel[p.kategori]}</span>
+                {p.statusBayar === "KREDIT" && <span className="px-1.5 py-0.5 bg-amber-100 text-amber-700 rounded text-[11px] font-medium">Kredit</span>}
                 <span>{p.jumlah} &times; {formatRupiah(p.harga)}</span>
                 <span>{new Date(p.tanggal).toLocaleDateString("id-ID", { day: "numeric", month: "short" })}</span>
               </div>

@@ -16,6 +16,11 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
 
   const newRecord = await prisma.penjualan.update({ where: { id }, data: { produkId, qty, hargaJual, total, metodeBayar, hargaDisesuaikan } });
 
+  if (oldRecord.qty !== qty) {
+    const diff = oldRecord.qty - qty;
+    await prisma.produk.update({ where: { id: oldRecord.produkId }, data: { stok: { increment: diff } } }).catch(() => {});
+  }
+
   const fieldsToLog = ["produkId", "qty", "hargaJual", "total", "metodeBayar", "hargaDisesuaikan"];
   const oldData: Record<string, unknown> = {};
   const newData: Record<string, unknown> = {};
@@ -75,5 +80,8 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
   });
 
   await prisma.penjualan.delete({ where: { id } });
+
+  await prisma.produk.update({ where: { id: record.produkId }, data: { stok: { increment: record.qty } } }).catch(() => {});
+
   return NextResponse.json({ success: true });
 }
