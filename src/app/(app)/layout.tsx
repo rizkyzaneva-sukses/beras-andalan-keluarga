@@ -28,6 +28,7 @@ const NAV_ITEMS: NavItem[] = [
   { href: "/barcode", label: "Barcode", short: "QR", ownerOnly: true },
   { href: "/modal", label: "Modal", short: "Modal", ownerOnly: true },
   { href: "/audit", label: "Audit", short: "Audit", ownerOnly: true },
+  { href: "/panduan", label: "Panduan", short: "Bantu", ownerOnly: false },
 ];
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
