@@ -40,3 +40,6 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 prisma/dev.db
+
+# Prevent CI workflow from being pushed (PAT missing workflow scope)
+.github/workflows/
