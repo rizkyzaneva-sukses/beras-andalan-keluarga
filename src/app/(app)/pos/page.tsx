@@ -40,6 +40,32 @@ export default function PosPage() {
       .catch(() => {});
   }, []);
 
+  const addToCart = useCallback((product: Produk) => {
+    setCart((prev) => {
+      const existing = prev.find((item) => item.produkId === product.id);
+      if (existing)
+        return prev.map((item) =>
+          item.produkId === product.id ? { ...item, qty: item.qty + 1 } : item
+        );
+      return [
+        ...prev,
+        { produkId: product.id, nama: product.nama, hargaJual: product.hargaJual, qty: 1 },
+      ];
+    });
+  }, []);
+
+  const onScanSuccess = useCallback(
+    (decodedText: string) => {
+      const product = produk.find((p) => p.id === decodedText);
+      if (product) addToCart(product);
+      if (scannerRef.current) scannerRef.current.clear().catch(() => {});
+      setShowScanner(false);
+    },
+    [addToCart, produk]
+  );
+
+  const onScanError = useCallback(() => {}, []);
+
   useEffect(() => {
     if (showScanner) {
       scannerRef.current = new Html5QrcodeScanner(
@@ -54,33 +80,7 @@ export default function PosPage() {
         scannerRef.current.clear().catch(() => {});
       }
     };
-  }, [showScanner]);
-
-  const onScanSuccess = useCallback(
-    (decodedText: string) => {
-      const product = produk.find((p) => p.id === decodedText);
-      if (product) addToCart(product);
-      if (scannerRef.current) scannerRef.current.clear().catch(() => {});
-      setShowScanner(false);
-    },
-    [produk]
-  );
-
-  const onScanError = useCallback(() => {}, []);
-
-  const addToCart = (product: Produk) => {
-    setCart((prev) => {
-      const existing = prev.find((item) => item.produkId === product.id);
-      if (existing)
-        return prev.map((item) =>
-          item.produkId === product.id ? { ...item, qty: item.qty + 1 } : item
-        );
-      return [
-        ...prev,
-        { produkId: product.id, nama: product.nama, hargaJual: product.hargaJual, qty: 1 },
-      ];
-    });
-  };
+  }, [onScanError, onScanSuccess, showScanner]);
 
   const changeQty = (produkId: string, delta: number) => {
     setCart((prev) =>
