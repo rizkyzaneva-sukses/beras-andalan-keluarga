@@ -17,19 +17,42 @@ export async function GET(request: NextRequest) {
   const toDateExclusive = new Date(`${to}T00:00:00.000Z`);
   toDateExclusive.setUTCDate(toDateExclusive.getUTCDate() + 1);
 
-  const users = await prisma.user.findMany({ where: { isActive: true }, select: { id: true, username: true, role: true } });
-  const penjualan = await prisma.penjualan.findMany({
-    where: { tanggal: { gte: fromDate, lt: toDateExclusive } },
-    select: { createdBy: true, metodeBayar: true, total: true },
-  });
+  const [users, penjualan] = await Promise.all([
+    prisma.user.findMany({
+      where: {
+        OR: [
+          { isActive: true },
+          { penjualan: { some: { tanggal: { gte: fromDate, lt: toDateExclusive } } } },
+        ],
+      },
+      select: { id: true, username: true, role: true, isActive: true },
+    }),
+    prisma.penjualan.findMany({
+      where: { tanggal: { gte: fromDate, lt: toDateExclusive } },
+      select: { createdBy: true, metodeBayar: true, total: true, qty: true },
+    }),
+  ]);
 
-  const result = users.map((u) => {
-    const userSales = penjualan.filter((p) => p.createdBy === u.id);
-    const cash = userSales.filter((p) => p.metodeBayar === "CASH").reduce((s, p) => s + p.total, 0);
-    const transfer = userSales.filter((p) => p.metodeBayar === "TRANSFER").reduce((s, p) => s + p.total, 0);
-    const qris = userSales.filter((p) => p.metodeBayar === "QRIS").reduce((s, p) => s + p.total, 0);
-    return { userId: u.id, username: u.username, role: u.role, cashTotal: cash, transferTotal: transfer, qrisTotal: qris, total: cash + transfer + qris };
-  });
+  const result = users
+    .map((u) => {
+      const userSales = penjualan.filter((p) => p.createdBy === u.id);
+      const cash = userSales.filter((p) => p.metodeBayar === "CASH").reduce((s, p) => s + p.total, 0);
+      const transfer = userSales.filter((p) => p.metodeBayar === "TRANSFER").reduce((s, p) => s + p.total, 0);
+      const qris = userSales.filter((p) => p.metodeBayar === "QRIS").reduce((s, p) => s + p.total, 0);
+      return {
+        userId: u.id,
+        username: u.username,
+        role: u.role,
+        isActive: u.isActive,
+        cashTotal: cash,
+        transferTotal: transfer,
+        qrisTotal: qris,
+        total: cash + transfer + qris,
+        transaksi: userSales.length,
+        qty: userSales.reduce((s, p) => s + p.qty, 0),
+      };
+    })
+    .sort((a, b) => b.total - a.total || a.username.localeCompare(b.username));
 
   return NextResponse.json({ data: result });
 }

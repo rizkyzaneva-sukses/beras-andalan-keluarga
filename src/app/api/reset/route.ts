@@ -9,6 +9,8 @@ export async function POST() {
     return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
   }
 
+  await prisma.pembayaranUtang.deleteMany();
+  await prisma.auditLog.deleteMany();
   await prisma.penjualan.deleteMany();
   await prisma.pembelanjaan.deleteMany();
   await prisma.modalLog.deleteMany();

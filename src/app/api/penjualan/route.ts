@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/session";
+import { writeAudit } from "@/lib/audit";
 
 export async function GET(request: NextRequest) {
   const session = await getSession();
@@ -22,7 +23,10 @@ export async function GET(request: NextRequest) {
 
   const data = await prisma.penjualan.findMany({
     where,
-    include: { produk: { select: { nama: true } } },
+    include: {
+      produk: { select: { nama: true } },
+      user: { select: { username: true } },
+    },
     orderBy: { createdAt: "desc" },
   });
 
@@ -37,6 +41,7 @@ export async function GET(request: NextRequest) {
     metodeBayar: p.metodeBayar,
     hargaDisesuaikan: p.hargaDisesuaikan,
     createdBy: p.createdBy,
+    createdByUsername: p.user.username,
   }));
 
   return NextResponse.json({ data: mapped });
@@ -69,7 +74,25 @@ export async function POST(request: NextRequest) {
     },
   });
 
-  await prisma.produk.update({ where: { id: produkId }, data: { stok: { decrement: qty } } }).catch(() => {});
+  const produk = await prisma.produk.update({
+    where: { id: produkId },
+    data: { stok: { decrement: qty } },
+  }).catch(() => prisma.produk.findUnique({ where: { id: produkId } }));
+
+  await writeAudit({
+    entityType: "PENJUALAN",
+    entityId: penjualan.id,
+    action: "CREATE",
+    newData: {
+      produkNama: produk?.nama,
+      qty,
+      hargaJual,
+      total,
+      metodeBayar,
+      tanggal: penjualan.tanggal,
+    },
+    userId: session.userId,
+  });
 
   return NextResponse.json(penjualan, { status: 201 });
 }

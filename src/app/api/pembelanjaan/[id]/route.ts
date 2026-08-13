@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/session";
+import { diffFields, writeAudit } from "@/lib/audit";
 
 export async function PUT(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const session = await getSession();
@@ -30,31 +31,20 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     },
   });
 
-  const fieldsToLog = ["tanggal", "kategori", "namaBarang", "jumlah", "harga", "total", "statusBayar"];
-  const oldData: Record<string, unknown> = {};
-  const newData: Record<string, unknown> = {};
-  let hasChanges = false;
-
-  for (const f of fieldsToLog) {
-    const oldVal = (oldRecord as Record<string, unknown>)[f];
-    const newVal = (newRecord as Record<string, unknown>)[f];
-    if (JSON.stringify(oldVal) !== JSON.stringify(newVal)) {
-      oldData[f] = oldVal;
-      newData[f] = newVal;
-      hasChanges = true;
-    }
-  }
+  const { oldData, newData, hasChanges } = diffFields(
+    oldRecord as unknown as Record<string, unknown>,
+    newRecord as unknown as Record<string, unknown>,
+    ["tanggal", "kategori", "namaBarang", "jumlah", "harga", "total", "statusBayar"],
+  );
 
   if (hasChanges) {
-    await prisma.auditLog.create({
-      data: {
-        entityType: "PEMBELANJAAN",
-        entityId: id,
-        action: "UPDATE",
-        oldData: JSON.stringify(oldData),
-        newData: JSON.stringify(newData),
-        userId: session.userId,
-      },
+    await writeAudit({
+      entityType: "PEMBELANJAAN",
+      entityId: id,
+      action: "UPDATE",
+      oldData,
+      newData,
+      userId: session.userId,
     });
   }
 
@@ -71,21 +61,19 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
   const record = await prisma.pembelanjaan.findUnique({ where: { id } });
   if (!record) return NextResponse.json({ error: "Data tidak ditemukan" }, { status: 404 });
 
-  await prisma.auditLog.create({
-    data: {
-      entityType: "PEMBELANJAAN",
-      entityId: id,
-      action: "DELETE",
-      oldData: JSON.stringify({
-        namaBarang: record.namaBarang,
-        kategori: record.kategori,
-        jumlah: record.jumlah,
-        harga: record.harga,
-        total: record.total,
-        tanggal: record.tanggal,
-      }),
-      userId: session.userId,
+  await writeAudit({
+    entityType: "PEMBELANJAAN",
+    entityId: id,
+    action: "DELETE",
+    oldData: {
+      namaBarang: record.namaBarang,
+      kategori: record.kategori,
+      jumlah: record.jumlah,
+      harga: record.harga,
+      total: record.total,
+      tanggal: record.tanggal,
     },
+    userId: session.userId,
   });
 
   await prisma.pembayaranUtang.deleteMany({ where: { pembelanjaanId: id } });

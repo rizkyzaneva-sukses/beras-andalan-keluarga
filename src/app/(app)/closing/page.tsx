@@ -13,18 +13,32 @@ interface ClosingData {
   totalModal: number;
 }
 
+interface OmsetKasir {
+  userId: string;
+  username: string;
+  role: string;
+  cashTotal: number;
+  transferTotal: number;
+  qrisTotal: number;
+  total: number;
+  transaksi: number;
+}
+
 export default function ClosingPage() {
   const [data, setData] = useState<ClosingData | null>(null);
+  const [omsetKasir, setOmsetKasir] = useState<OmsetKasir[]>([]);
   const [loading, setLoading] = useState(true);
   const today = new Date().toISOString().slice(0, 10);
 
   useEffect(() => {
     async function fetchClosing() {
-      const [summaryRes, penjualanRes, pembelanjaanRes] = await Promise.all([
+      const [summaryRes, penjualanRes, pembelanjaanRes, omsetRes] = await Promise.all([
         fetch(`/api/laporan/summary?from=${today}&to=${today}`).then((r) => r.json()),
         fetch(`/api/penjualan?from=${today}&to=${today}`).then((r) => r.json()),
         fetch(`/api/pembelanjaan?from=${today}&to=${today}`).then((r) => r.json()),
+        fetch(`/api/closing/per-kasir?from=${today}&to=${today}`).then((r) => r.json()),
       ]);
+      setOmsetKasir(omsetRes.data || []);
       const penjualanList = penjualanRes.data || [];
       const cashTotal = penjualanList.filter((p: { metodeBayar: string }) => p.metodeBayar === "CASH").reduce((s: number, p: { total: number }) => s + p.total, 0);
       const transferTotal = penjualanList.filter((p: { metodeBayar: string }) => p.metodeBayar === "TRANSFER").reduce((s: number, p: { total: number }) => s + p.total, 0);
@@ -95,6 +109,30 @@ export default function ClosingPage() {
             <div className="flex justify-between"><span className="text-muted-foreground">Pengeluaran</span><span className="font-mono font-medium text-red-600">-{formatRupiah(data.totalPengeluaran)}</span></div>
             <div className="border-t border-border pt-2 flex justify-between"><span className="font-semibold">Saldo Kas Saat Ini</span><span className="font-mono font-bold text-primary text-[15px]">{formatRupiah(data.totalModal + data.totalPendapatan - data.totalPengeluaran)}</span></div>
           </div>
+
+          {omsetKasir.length > 0 && (
+            <div>
+              <p className="text-sm font-semibold mb-2">Omset Per Kasir Hari Ini</p>
+              <div className="space-y-2">
+                {omsetKasir.map((u) => (
+                  <div key={u.userId} className="bg-white border border-border rounded-xl p-3 shadow-sm">
+                    <div className="flex justify-between items-start gap-2">
+                      <div>
+                        <p className="font-medium text-[15px]">{u.username}</p>
+                        <p className="text-[11px] text-muted-foreground">{u.transaksi} transaksi · {u.role === "OWNER" ? "Pemilik" : "Kasir"}</p>
+                      </div>
+                      <p className="font-mono font-bold text-[15px]">{formatRupiah(u.total)}</p>
+                    </div>
+                    <div className="mt-2 grid grid-cols-3 gap-1.5 text-[11px]">
+                      <div className="rounded-lg bg-muted px-2 py-1.5"><span className="text-muted-foreground">Tunai</span><p className="font-mono font-semibold">{u.cashTotal > 0 ? formatRupiah(u.cashTotal) : "—"}</p></div>
+                      <div className="rounded-lg bg-muted px-2 py-1.5"><span className="text-muted-foreground">Transfer</span><p className="font-mono font-semibold">{u.transferTotal > 0 ? formatRupiah(u.transferTotal) : "—"}</p></div>
+                      <div className="rounded-lg bg-muted px-2 py-1.5"><span className="text-muted-foreground">QRIS</span><p className="font-mono font-semibold">{u.qrisTotal > 0 ? formatRupiah(u.qrisTotal) : "—"}</p></div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       ) : null}
     </div>

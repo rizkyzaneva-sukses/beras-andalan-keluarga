@@ -44,6 +44,20 @@ export interface PenjualanEntry {
   metodeBayar: MetodeBayar;
   hargaDisesuaikan: boolean;
   createdBy: string;
+  createdByUsername?: string;
+}
+
+export interface OmsetPerUser {
+  userId: string;
+  username: string;
+  role: "OWNER" | "KASIR";
+  isActive: boolean;
+  cashTotal: number;
+  transferTotal: number;
+  qrisTotal: number;
+  total: number;
+  transaksi: number;
+  qty: number;
 }
 
 export interface LaporanSummary {

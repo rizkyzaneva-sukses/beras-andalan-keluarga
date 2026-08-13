@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/session";
+import { writeAudit } from "@/lib/audit";
 
 export async function GET() {
   const session = await getSession();
@@ -32,6 +33,13 @@ export async function POST(request: NextRequest) {
       keterangan: keterangan || null,
       createdBy: session.userId,
     },
+  });
+  await writeAudit({
+    entityType: "MODAL",
+    entityId: modal.id,
+    action: "CREATE",
+    newData: { jumlah, tanggal: modal.tanggal, keterangan: modal.keterangan },
+    userId: session.userId,
   });
   return NextResponse.json(modal, { status: 201 });
 }

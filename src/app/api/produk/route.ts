@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/session";
+import { writeAudit } from "@/lib/audit";
 
 export async function GET() {
   const session = await getSession();
@@ -28,6 +29,13 @@ export async function POST(request: NextRequest) {
 
   const produk = await prisma.produk.create({
     data: { nama, satuan, hargaBeli, hargaJual },
+  });
+  await writeAudit({
+    entityType: "PRODUK",
+    entityId: produk.id,
+    action: "CREATE",
+    newData: { nama, satuan, hargaBeli, hargaJual },
+    userId: session.userId,
   });
   return NextResponse.json(produk, { status: 201 });
 }

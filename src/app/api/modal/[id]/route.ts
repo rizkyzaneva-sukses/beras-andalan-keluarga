@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/session";
+import { diffFields, writeAudit } from "@/lib/audit";
 
 export async function PUT(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const session = await getSession();
@@ -15,31 +16,20 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
   const { jumlah, tanggal, keterangan } = await request.json();
   const newRecord = await prisma.modalLog.update({ where: { id }, data: { jumlah, tanggal: new Date(tanggal), keterangan } });
 
-  const fieldsToLog = ["jumlah", "tanggal", "keterangan"];
-  const oldData: Record<string, unknown> = {};
-  const newData: Record<string, unknown> = {};
-  let hasChanges = false;
-
-  for (const f of fieldsToLog) {
-    const oldVal = (oldRecord as Record<string, unknown>)[f];
-    const newVal = (newRecord as Record<string, unknown>)[f];
-    if (JSON.stringify(oldVal) !== JSON.stringify(newVal)) {
-      oldData[f] = oldVal;
-      newData[f] = newVal;
-      hasChanges = true;
-    }
-  }
+  const { oldData, newData, hasChanges } = diffFields(
+    oldRecord as unknown as Record<string, unknown>,
+    newRecord as unknown as Record<string, unknown>,
+    ["jumlah", "tanggal", "keterangan"],
+  );
 
   if (hasChanges) {
-    await prisma.auditLog.create({
-      data: {
-        entityType: "MODAL",
-        entityId: id,
-        action: "UPDATE",
-        oldData: JSON.stringify(oldData),
-        newData: JSON.stringify(newData),
-        userId: session.userId,
-      },
+    await writeAudit({
+      entityType: "MODAL",
+      entityId: id,
+      action: "UPDATE",
+      oldData,
+      newData,
+      userId: session.userId,
     });
   }
 
@@ -56,14 +46,12 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
   const record = await prisma.modalLog.findUnique({ where: { id } });
   if (!record) return NextResponse.json({ error: "Data tidak ditemukan" }, { status: 404 });
 
-  await prisma.auditLog.create({
-    data: {
-      entityType: "MODAL",
-      entityId: id,
-      action: "DELETE",
-      oldData: JSON.stringify({ jumlah: record.jumlah, tanggal: record.tanggal, keterangan: record.keterangan }),
-      userId: session.userId,
-    },
+  await writeAudit({
+    entityType: "MODAL",
+    entityId: id,
+    action: "DELETE",
+    oldData: { jumlah: record.jumlah, tanggal: record.tanggal, keterangan: record.keterangan },
+    userId: session.userId,
   });
 
   await prisma.modalLog.delete({ where: { id } });

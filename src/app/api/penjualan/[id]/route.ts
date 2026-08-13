@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/session";
+import { diffFields, writeAudit } from "@/lib/audit";
 
 export async function PUT(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const session = await getSession();
@@ -24,31 +25,20 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     await prisma.produk.update({ where: { id: oldRecord.produkId }, data: { stok: { increment: diff } } }).catch(() => {});
   }
 
-  const fieldsToLog = ["produkId", "qty", "hargaJual", "total", "metodeBayar", "hargaDisesuaikan"];
-  const oldData: Record<string, unknown> = {};
-  const newData: Record<string, unknown> = {};
-  let hasChanges = false;
-
-  for (const f of fieldsToLog) {
-    const oldVal = (oldRecord as Record<string, unknown>)[f];
-    const newVal = (newRecord as Record<string, unknown>)[f];
-    if (JSON.stringify(oldVal) !== JSON.stringify(newVal)) {
-      oldData[f] = oldVal;
-      newData[f] = newVal;
-      hasChanges = true;
-    }
-  }
+  const { oldData, newData, hasChanges } = diffFields(
+    oldRecord as unknown as Record<string, unknown>,
+    newRecord as unknown as Record<string, unknown>,
+    ["produkId", "qty", "hargaJual", "total", "metodeBayar", "hargaDisesuaikan"],
+  );
 
   if (hasChanges) {
-    await prisma.auditLog.create({
-      data: {
-        entityType: "PENJUALAN",
-        entityId: id,
-        action: "UPDATE",
-        oldData: JSON.stringify(oldData),
-        newData: JSON.stringify(newData),
-        userId: session.userId,
-      },
+    await writeAudit({
+      entityType: "PENJUALAN",
+      entityId: id,
+      action: "UPDATE",
+      oldData,
+      newData,
+      userId: session.userId,
     });
   }
 
@@ -65,21 +55,19 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
   const record = await prisma.penjualan.findUnique({ where: { id }, include: { produk: { select: { nama: true } } } });
   if (!record) return NextResponse.json({ error: "Data tidak ditemukan" }, { status: 404 });
 
-  await prisma.auditLog.create({
-    data: {
-      entityType: "PENJUALAN",
-      entityId: id,
-      action: "DELETE",
-      oldData: JSON.stringify({
-        produkNama: record.produk.nama,
-        qty: record.qty,
-        hargaJual: record.hargaJual,
-        total: record.total,
-        metodeBayar: record.metodeBayar,
-        tanggal: record.tanggal,
-      }),
-      userId: session.userId,
+  await writeAudit({
+    entityType: "PENJUALAN",
+    entityId: id,
+    action: "DELETE",
+    oldData: {
+      produkNama: record.produk.nama,
+      qty: record.qty,
+      hargaJual: record.hargaJual,
+      total: record.total,
+      metodeBayar: record.metodeBayar,
+      tanggal: record.tanggal,
     },
+    userId: session.userId,
   });
 
   await prisma.penjualan.delete({ where: { id } });

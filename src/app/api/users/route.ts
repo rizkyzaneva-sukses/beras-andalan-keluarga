@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/session";
+import { writeAudit } from "@/lib/audit";
 import bcrypt from "bcryptjs";
 
 export async function GET() {
@@ -29,6 +30,13 @@ export async function POST(request: NextRequest) {
   const user = await prisma.user.create({
     data: { username, passwordHash: await bcrypt.hash(password, 10), role },
     select: { id: true, username: true, role: true, isActive: true, createdAt: true },
+  });
+  await writeAudit({
+    entityType: "USER",
+    entityId: user.id,
+    action: "CREATE",
+    newData: { username: user.username, role: user.role, isActive: user.isActive },
+    userId: session.userId,
   });
   return NextResponse.json({ data: user }, { status: 201 });
 }

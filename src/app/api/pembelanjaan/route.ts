@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/session";
+import { writeAudit } from "@/lib/audit";
 
 export async function GET(request: NextRequest) {
   const session = await getSession();
@@ -52,6 +53,22 @@ export async function POST(request: NextRequest) {
       statusBayar: statusBayar || "CASH",
       createdBy: session.userId,
     },
+  });
+
+  await writeAudit({
+    entityType: "PEMBELANJAAN",
+    entityId: pembelanjaan.id,
+    action: "CREATE",
+    newData: {
+      namaBarang,
+      kategori,
+      jumlah,
+      harga,
+      total,
+      statusBayar: pembelanjaan.statusBayar,
+      tanggal: pembelanjaan.tanggal,
+    },
+    userId: session.userId,
   });
 
   if (kategori === "RESTOCK") {
