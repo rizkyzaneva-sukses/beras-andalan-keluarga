@@ -7,10 +7,12 @@ interface ClosingData {
   penjualanCash: number;
   penjualanTransfer: number;
   penjualanQris: number;
+  penjualanHutang: number;
   totalPendapatan: number;
   totalPengeluaran: number;
   labaRugi: number;
   totalModal: number;
+  totalPiutang: number;
 }
 
 interface OmsetKasir {
@@ -20,6 +22,7 @@ interface OmsetKasir {
   cashTotal: number;
   transferTotal: number;
   qrisTotal: number;
+  hutangTotal?: number;
   total: number;
   transaksi: number;
 }
@@ -43,16 +46,19 @@ export default function ClosingPage() {
       const cashTotal = penjualanList.filter((p: { metodeBayar: string }) => p.metodeBayar === "CASH").reduce((s: number, p: { total: number }) => s + p.total, 0);
       const transferTotal = penjualanList.filter((p: { metodeBayar: string }) => p.metodeBayar === "TRANSFER").reduce((s: number, p: { total: number }) => s + p.total, 0);
       const qrisTotal = penjualanList.filter((p: { metodeBayar: string }) => p.metodeBayar === "QRIS").reduce((s: number, p: { total: number }) => s + p.total, 0);
+      const hutangTotal = penjualanList.filter((p: { metodeBayar: string }) => p.metodeBayar === "HUTANG").reduce((s: number, p: { total: number }) => s + p.total, 0);
 
       setData({
         tanggal: today,
         penjualanCash: cashTotal,
         penjualanTransfer: transferTotal,
         penjualanQris: qrisTotal,
+        penjualanHutang: hutangTotal,
         totalPendapatan: summaryRes.totalPendapatan || 0,
         totalPengeluaran: summaryRes.totalPengeluaran || 0,
         labaRugi: summaryRes.labaRugi || 0,
         totalModal: summaryRes.totalModal || 0,
+        totalPiutang: summaryRes.totalPiutang || 0,
       });
       setLoading(false);
     }
@@ -77,7 +83,7 @@ export default function ClosingPage() {
             <p className="text-3xl font-bold text-green-800 font-mono mt-1">{formatRupiah(data.totalPendapatan)}</p>
           </div>
 
-          <div className="grid grid-cols-3 gap-2">
+          <div className="grid grid-cols-2 gap-2">
             <div className="bg-white border border-border rounded-xl p-3 shadow-sm">
               <p className="text-[10px] text-muted-foreground font-medium uppercase tracking-wide">Tunai</p>
               <p className="text-base font-bold font-mono mt-0.5">{formatRupiah(data.penjualanCash)}</p>
@@ -90,7 +96,14 @@ export default function ClosingPage() {
               <p className="text-[10px] text-muted-foreground font-medium uppercase tracking-wide">QRIS</p>
               <p className="text-base font-bold font-mono mt-0.5">{formatRupiah(data.penjualanQris)}</p>
             </div>
+            <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 shadow-sm">
+              <p className="text-[10px] text-amber-800 font-medium uppercase tracking-wide">Hutang hari ini</p>
+              <p className="text-base font-bold font-mono mt-0.5 text-amber-900">{formatRupiah(data.penjualanHutang)}</p>
+            </div>
           </div>
+          {data.totalPiutang > 0 && (
+            <p className="text-xs text-amber-800">Masih ada hutang pelanggan belum lunas: {formatRupiah(data.totalPiutang)}</p>
+          )}
 
           <div className="grid grid-cols-2 gap-3">
             <div className="bg-red-50 border border-red-200 rounded-xl p-3 shadow-sm">
@@ -123,10 +136,11 @@ export default function ClosingPage() {
                       </div>
                       <p className="font-mono font-bold text-[15px]">{formatRupiah(u.total)}</p>
                     </div>
-                    <div className="mt-2 grid grid-cols-3 gap-1.5 text-[11px]">
+                    <div className="mt-2 grid grid-cols-4 gap-1.5 text-[11px]">
                       <div className="rounded-lg bg-muted px-2 py-1.5"><span className="text-muted-foreground">Tunai</span><p className="font-mono font-semibold">{u.cashTotal > 0 ? formatRupiah(u.cashTotal) : "—"}</p></div>
                       <div className="rounded-lg bg-muted px-2 py-1.5"><span className="text-muted-foreground">Transfer</span><p className="font-mono font-semibold">{u.transferTotal > 0 ? formatRupiah(u.transferTotal) : "—"}</p></div>
                       <div className="rounded-lg bg-muted px-2 py-1.5"><span className="text-muted-foreground">QRIS</span><p className="font-mono font-semibold">{u.qrisTotal > 0 ? formatRupiah(u.qrisTotal) : "—"}</p></div>
+                      <div className="rounded-lg bg-amber-50 px-2 py-1.5"><span className="text-amber-800">Hutang</span><p className="font-mono font-semibold">{(u.hutangTotal ?? 0) > 0 ? formatRupiah(u.hutangTotal ?? 0) : "—"}</p></div>
                     </div>
                   </div>
                 ))}

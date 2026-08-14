@@ -1,5 +1,5 @@
 export type UserRole = "OWNER" | "KASIR";
-export type MetodeBayar = "CASH" | "TRANSFER" | "QRIS";
+export type MetodeBayar = "CASH" | "TRANSFER" | "QRIS" | "HUTANG";
 export type KategoriPembelanjaan = "RESTOCK" | "OPERASIONAL" | "LAINNYA";
 
 export interface Product {
@@ -30,6 +30,7 @@ export interface PembelanjaanEntry {
   harga: number;
   total: number;
   statusBayar: "CASH" | "KREDIT";
+  produkId?: string | null;
   createdBy: string;
 }
 
@@ -43,8 +44,19 @@ export interface PenjualanEntry {
   total: number;
   metodeBayar: MetodeBayar;
   hargaDisesuaikan: boolean;
+  namaPelanggan?: string | null;
+  piutangId?: string | null;
   createdBy: string;
   createdByUsername?: string;
+}
+
+export interface PiutangItem {
+  id: string;
+  namaPelanggan: string;
+  tanggal: string;
+  total: number;
+  sudahDibayar: number;
+  keterangan: string | null;
 }
 
 export interface OmsetPerUser {
@@ -55,6 +67,7 @@ export interface OmsetPerUser {
   cashTotal: number;
   transferTotal: number;
   qrisTotal: number;
+  hutangTotal: number;
   total: number;
   transaksi: number;
   qty: number;
@@ -66,4 +79,5 @@ export interface LaporanSummary {
   labaRugi: number;
   totalModal: number;
   saldoKas: number;
+  totalPiutang: number;
 }

@@ -22,6 +22,7 @@ function formatRupiah(n: number) {
 function metodeLabel(m: string) {
   if (m === "CASH") return "Tunai";
   if (m === "QRIS") return "QRIS";
+  if (m === "HUTANG") return "Hutang";
   return "Transfer";
 }
 
@@ -250,6 +251,12 @@ export default function DashboardPage() {
               <p className="text-xs text-muted-foreground mt-1">Modal {formatRupiah(summary.totalModal)}</p>
             </div>
           </div>
+          {(summary.totalPiutang ?? 0) > 0 && (
+            <div className="card-surface p-3.5 bg-amber-50 border-amber-200">
+              <p className="text-[11px] text-amber-800 font-semibold uppercase tracking-wide">Hutang pelanggan belum lunas</p>
+              <p className="text-lg font-bold text-amber-900 font-mono mt-0.5">{formatRupiah(summary.totalPiutang)}</p>
+            </div>
+          )}
 
           <div>
             <div className="flex items-end justify-between gap-2 mb-2">
@@ -305,7 +312,7 @@ export default function DashboardPage() {
                         </div>
                         <p className="font-mono font-bold text-[15px] shrink-0">{formatRupiah(u.total)}</p>
                       </div>
-                      <div className="mt-2 grid grid-cols-3 gap-1.5">
+                      <div className="mt-2 grid grid-cols-4 gap-1.5">
                         <div className="rounded-lg bg-muted/80 px-2 py-1.5">
                           <p className="text-[10px] text-muted-foreground font-medium">Tunai</p>
                           <p className="font-mono text-[12px] font-semibold">{u.cashTotal > 0 ? formatRupiah(u.cashTotal) : "—"}</p>
@@ -317,6 +324,10 @@ export default function DashboardPage() {
                         <div className="rounded-lg bg-muted/80 px-2 py-1.5">
                           <p className="text-[10px] text-muted-foreground font-medium">QRIS</p>
                           <p className="font-mono text-[12px] font-semibold">{u.qrisTotal > 0 ? formatRupiah(u.qrisTotal) : "—"}</p>
+                        </div>
+                        <div className="rounded-lg bg-amber-50 px-2 py-1.5">
+                          <p className="text-[10px] text-amber-800 font-medium">Hutang</p>
+                          <p className="font-mono text-[12px] font-semibold">{(u.hutangTotal ?? 0) > 0 ? formatRupiah(u.hutangTotal) : "—"}</p>
                         </div>
                       </div>
                     </button>
@@ -355,6 +366,7 @@ export default function DashboardPage() {
                           <p className="font-medium text-[15px] truncate">{p.produkNama || p.produkId}</p>
                           <p className="text-xs text-muted-foreground mt-0.5">
                             {p.qty} &times; {formatRupiah(p.hargaJual)} &middot; {metodeLabel(p.metodeBayar)}
+                            {p.namaPelanggan ? ` · ${p.namaPelanggan}` : ""}
                             {p.createdByUsername ? ` · ${p.createdByUsername}` : ""}
                           </p>
                         </div>

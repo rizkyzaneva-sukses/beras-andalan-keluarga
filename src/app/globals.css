@@ -139,6 +139,16 @@ body {
     box-shadow: 0 0 0 3px rgb(34 197 94 / 0.18);
   }
 
+  #barcode-reader video {
+    width: 100% !important;
+    border-radius: 12px;
+  }
+  #barcode-reader img,
+  #html5-qrcode-anchor-scan-type-change,
+  #html5-qrcode-button-file-selection {
+    display: none !important;
+  }
+
   .page-wrap {
     width: 100%;
     max-width: 42rem;

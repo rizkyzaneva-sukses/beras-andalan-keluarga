@@ -22,6 +22,8 @@ const ENTITY_LABELS: Record<string, string> = {
   PRODUK: "Produk",
   USER: "User",
   UTANG: "Utang",
+  PIUTANG: "Hutang pelanggan",
+  STOK: "Stok",
 };
 
 const ACTION_LABELS: Record<string, string> = {
@@ -47,6 +49,9 @@ const FIELD_LABELS: Record<string, string> = {
   satuan: "Satuan",
   tanggal: "Tanggal",
   keterangan: "Keterangan",
+  namaPelanggan: "Pelanggan",
+  stok: "Stok",
+  arah: "Arah",
   role: "Role",
   isActive: "Aktif",
   hargaDisesuaikan: "Harga khusus",
@@ -75,7 +80,7 @@ function renderValue(key: string, val: unknown, entityType?: string): string {
   if (typeof val === "number" && moneyKeys) {
     return formatRupiah(val);
   }
-  if (key === "metodeBayar") return val === "CASH" ? "Tunai" : val === "TRANSFER" ? "Transfer" : val === "QRIS" ? "QRIS" : String(val);
+  if (key === "metodeBayar") return val === "CASH" ? "Tunai" : val === "TRANSFER" ? "Transfer" : val === "QRIS" ? "QRIS" : val === "HUTANG" ? "Hutang" : String(val);
   if (key === "kategori") return val === "RESTOCK" ? "Restock" : val === "OPERASIONAL" ? "Operasional" : val === "LAINNYA" ? "Lainnya" : String(val);
   if (key === "statusBayar") return val === "KREDIT" ? "Kredit" : "Tunai";
   if (key === "role") return val === "OWNER" ? "Pemilik" : val === "KASIR" ? "Kasir" : String(val);

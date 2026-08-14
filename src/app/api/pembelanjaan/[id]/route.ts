@@ -13,7 +13,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
   const oldRecord = await prisma.pembelanjaan.findUnique({ where: { id } });
   if (!oldRecord) return NextResponse.json({ error: "Data tidak ditemukan" }, { status: 404 });
 
-  const { tanggal, kategori, namaBarang, jumlah, harga, total, statusBayar } = await request.json();
+  const { tanggal, kategori, namaBarang, jumlah, harga, total, statusBayar, produkId } = await request.json();
   if (!Number.isInteger(jumlah) || jumlah <= 0 || !Number.isInteger(harga) || harga <= 0 || total !== jumlah * harga) {
     return NextResponse.json({ error: "Perhitungan pengeluaran tidak valid" }, { status: 400 });
   }
@@ -28,6 +28,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       harga,
       total,
       statusBayar: statusBayar || oldRecord.statusBayar,
+      produkId: typeof produkId === "string" && produkId ? produkId : oldRecord.produkId,
     },
   });
 

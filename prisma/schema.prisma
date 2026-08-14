@@ -22,6 +22,7 @@ enum MetodeBayar {
   CASH
   TRANSFER
   QRIS
+  HUTANG
 }
 
 enum StatusBayar {
@@ -37,11 +38,13 @@ model User {
   isActive     Boolean  @default(true) @map("is_active")
   createdAt    DateTime @default(now()) @map("created_at")
 
-  penjualan       Penjualan[]
-  pembelanjaan    Pembelanjaan[]
-  modalLog        ModalLog[]
-  auditLog        AuditLog[]
-  pembayaranUtang PembayaranUtang[]
+  penjualan         Penjualan[]
+  pembelanjaan      Pembelanjaan[]
+  modalLog          ModalLog[]
+  auditLog          AuditLog[]
+  pembayaranUtang   PembayaranUtang[]
+  piutang           Piutang[]
+  pembayaranPiutang PembayaranPiutang[]
 
   @@map("user")
 }
@@ -57,7 +60,8 @@ model Produk {
   aktif        Boolean  @default(true)
   createdAt    DateTime @default(now()) @map("created_at")
 
-  penjualan Penjualan[]
+  penjualan    Penjualan[]
+  pembelanjaan Pembelanjaan[]
 
   @@map("produk")
 }
@@ -85,10 +89,12 @@ model Pembelanjaan {
   total         Int
   statusBayar   StatusBayar          @default(CASH) @map("status_bayar")
   sudahDibayar  Int                  @default(0) @map("sudah_dibayar")
+  produkId      String?              @map("produk_id")
   createdBy     String               @map("created_by")
   createdAt     DateTime             @default(now()) @map("created_at")
 
   user            User              @relation(fields: [createdBy], references: [id])
+  produk          Produk?           @relation(fields: [produkId], references: [id])
   pembayaranUtang PembayaranUtang[]
 
   @@map("pembelanjaan")
@@ -103,11 +109,14 @@ model Penjualan {
   total             Int
   metodeBayar       MetodeBayar @map("metode_bayar")
   hargaDisesuaikan  Boolean     @default(false) @map("harga_disesuaikan")
+  namaPelanggan     String?     @map("nama_pelanggan")
+  piutangId         String?     @map("piutang_id")
   createdBy         String      @map("created_by")
   createdAt         DateTime    @default(now()) @map("created_at")
 
-  produk Produk @relation(fields: [produkId], references: [id])
-  user   User   @relation(fields: [createdBy], references: [id])
+  produk  Produk   @relation(fields: [produkId], references: [id])
+  user    User     @relation(fields: [createdBy], references: [id])
+  piutang Piutang? @relation(fields: [piutangId], references: [id])
 
   @@map("penjualan")
 }
@@ -139,4 +148,36 @@ model PembayaranUtang {
   user         User         @relation(fields: [createdBy], references: [id])
 
   @@map("pembayaran_utang")
+}
+
+model Piutang {
+  id            String   @id @default(cuid())
+  namaPelanggan String   @map("nama_pelanggan")
+  tanggal       DateTime
+  total         Int
+  sudahDibayar  Int      @default(0) @map("sudah_dibayar")
+  keterangan    String?
+  createdBy     String   @map("created_by")
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  user       User                 @relation(fields: [createdBy], references: [id])
+  penjualan  Penjualan[]
+  pembayaran PembayaranPiutang[]
+
+  @@map("piutang")
+}
+
+model PembayaranPiutang {
+  id          String      @id @default(cuid())
+  piutangId   String      @map("piutang_id")
+  jumlah      Int
+  tanggal     DateTime
+  metodeBayar MetodeBayar @map("metode_bayar")
+  createdBy   String      @map("created_by")
+  createdAt   DateTime    @default(now()) @map("created_at")
+
+  piutang Piutang @relation(fields: [piutangId], references: [id])
+  user    User    @relation(fields: [createdBy], references: [id])
+
+  @@map("pembayaran_piutang")
 }

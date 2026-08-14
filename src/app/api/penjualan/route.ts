@@ -40,6 +40,8 @@ export async function GET(request: NextRequest) {
     total: p.total,
     metodeBayar: p.metodeBayar,
     hargaDisesuaikan: p.hargaDisesuaikan,
+    namaPelanggan: p.namaPelanggan,
+    piutangId: p.piutangId,
     createdBy: p.createdBy,
     createdByUsername: p.user.username,
   }));

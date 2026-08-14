@@ -25,7 +25,7 @@ const SECTIONS: { id: SectionId; label: string; ownerOnly?: boolean }[] = [
   { id: "produk", label: "Produk & Stok", ownerOnly: true },
   { id: "barcode", label: "Cetak Barcode", ownerOnly: true },
   { id: "pengeluaran", label: "Pengeluaran", ownerOnly: true },
-  { id: "utang", label: "Utang Vendor", ownerOnly: true },
+  { id: "utang", label: "Utang & Hutang" },
   { id: "modal", label: "Modal", ownerOnly: true },
   { id: "dashboard", label: "Dashboard", ownerOnly: true },
   { id: "closing", label: "Closing Harian", ownerOnly: true },
@@ -157,24 +157,30 @@ export default function PanduanPage() {
           <p className="text-sm text-muted-foreground">Menu utama kasir. Satu transaksi bisa banyak produk.</p>
           <ol className="space-y-3 mt-1">
             <Step n={1}>
-              <strong>Scan QR / Barcode</strong> — tekan tombol scan, arahkan kamera ke kode produk. Atau tekan{" "}
+              <strong>Scan Barcode</strong> — tekan tombol, kamera langsung terbuka. Arahkan ke kode produk. Tidak perlu pilih gambar dari galeri. Atau tekan{" "}
               <strong>+ Pilih Produk</strong> lalu cari nama.
             </Step>
             <Step n={2}>
               Atur jumlah di keranjang pakai tombol <strong>− / +</strong>. Hapus item dengan tombol ×.
             </Step>
             <Step n={3}>
-              Pilih metode bayar: <strong>Tunai</strong>, <strong>QRIS</strong>, atau <strong>Transfer</strong>.
+              Untuk telur ditimbang / harga khusus: tekan <strong>Ubah jumlah / harga</strong>, isi total sesuai hasil timbangan.
             </Step>
             <Step n={4}>
-              Jika <strong>Tunai</strong>: isi uang diterima → kembalian dihitung otomatis.
+              Pilih metode bayar: <strong>Tunai</strong>, <strong>QRIS</strong>, <strong>Transfer</strong>, atau <strong>Hutang</strong>.
             </Step>
             <Step n={5}>
+              Jika <strong>Tunai</strong>: isi uang diterima (angka otomatis pakai titik, contoh 150.000) → kembalian dihitung otomatis.
+            </Step>
+            <Step n={6}>
+              Jika <strong>Hutang</strong>: isi nama pelanggan, tekan <strong>Catat Hutang</strong>. Nanti bayar di menu Utang.
+            </Step>
+            <Step n={7}>
               Tekan <strong>BAYAR</strong>. Transaksi tersimpan & stok berkurang otomatis.
             </Step>
           </ol>
           <Callout type="warn">
-            Pastikan stok produk cukup. Kalau stok 0, restock dulu lewat menu Pengeluaran (kategori Restock).
+            Pastikan stok produk cukup. Kalau stok 0, isi stok di menu Produk (tombol + Isi Stok) atau Pengeluaran → Restock.
           </Callout>
         </Card>
       </div>
@@ -187,9 +193,15 @@ export default function PanduanPage() {
             </Step>
             <Step n={2}>Isi nama, satuan (kg/karung/liter), harga beli, harga jual.</Step>
             <Step n={3}>
-              <strong>Stok</strong> bertambah saat restock (Pengeluaran → Restock), berkurang saat jualan di POS.
+              Setelah produk & barcode dibuat, tekan <strong>+ Isi Stok</strong> pada kartu produk untuk mengisi jumlah (pcs/kg/karung). Nama produk sudah terpilih otomatis.
             </Step>
             <Step n={4}>
+              <strong>− Kurangi</strong> dipakai jika stok berkurang di luar penjualan (rusak, sampel, pecah karung).
+            </Step>
+            <Step n={5}>
+              <strong>Pindah</strong> untuk beras karungan yang dijual eceran: kurangi 1 karung, tambah 25 kg ke produk eceran. Harga tetap terpisah.
+            </Step>
+            <Step n={6}>
               Harga jual boleh diedit kapan saja (misal harga pasar naik) — tidak perlu cetak ulang QR, karena QR hanya berisi ID produk.
             </Step>
           </ol>
@@ -219,10 +231,10 @@ export default function PanduanPage() {
               Buka <Link href="/pembelanjaan" className="text-primary font-semibold underline">Pengeluaran</Link> → + Tambah.
             </Step>
             <Step n={2}>
-              Pilih kategori: <strong>Restock Beras</strong>, <strong>Operasional</strong>, atau <strong>Lainnya</strong>.
+              Pilih kategori: <strong>Restock Barang</strong>, <strong>Operasional</strong>, atau <strong>Lainnya</strong>.
             </Step>
             <Step n={3}>
-              Nama barang: ketik untuk search history (misal “angkut”) atau isi nama baru.
+              Restock: pilih nama produk dari daftar Master Produk (semua produk yang sudah dibuat muncul di sini). Operasional/Lainnya: ketik nama biaya.
             </Step>
             <Step n={4}>
               Status bayar: <strong>Cash</strong> = langsung potong kas. <strong>Kredit</strong> = tidak potong kas, masuk daftar Utang.
@@ -235,17 +247,16 @@ export default function PanduanPage() {
       </div>
 
       <div id="panduan-utang">
-        <Card title="7. Utang Vendor (Owner)">
-          <ol className="space-y-3">
+        <Card title="7. Utang Toko & Hutang Pelanggan">
+          <p className="text-sm text-muted-foreground">Ada 2 jenis di menu <Link href="/utang" className="text-primary font-semibold underline">Utang & Hutang</Link>.</p>
+          <ol className="space-y-3 mt-1">
             <Step n={1}>
-              Pengeluaran yang statusnya <strong>Kredit</strong> muncul di{" "}
-              <Link href="/utang" className="text-primary font-semibold underline">Utang</Link>.
+              <strong>Hutang Pelanggan</strong> — pelanggan belanja hari ini, bayar minggu depan. Catat di POS metode Hutang + nama. Saat bayar, tekan <strong>+ Terima Pembayaran</strong>.
             </Step>
-            <Step n={2}>Lihat sisa tagihan & progress bayar.</Step>
-            <Step n={3}>
-              Tekan <strong>+ Bayar Utang</strong> → isi jumlah → <strong>Bayar</strong>. Saldo kas berkurang.
+            <Step n={2}>
+              <strong>Utang Toko</strong> — belanja ke supplier tempo. Pengeluaran status <strong>Kredit</strong> muncul di sini. Tekan <strong>+ Bayar Utang</strong> untuk cicilan.
             </Step>
-            <Step n={4}>Bisa cicil; utang hilang dari daftar setelah lunas penuh.</Step>
+            <Step n={3}>Bisa dicicil. Hilang dari daftar setelah lunas.</Step>
           </ol>
         </Card>
       </div>
@@ -336,9 +347,27 @@ export default function PanduanPage() {
         <Card title="13. Tips & FAQ">
           <div className="space-y-4 text-sm">
             <div>
-              <p className="font-semibold text-foreground">Kenapa QR tidak scan?</p>
+              <p className="font-semibold text-foreground">Kenapa barcode tidak scan / malah buka gambar?</p>
               <p className="text-muted-foreground mt-1">
-                Izinkan kamera di browser. Pastikan pencahayaan cukup. Atau pakai + Pilih Produk manual.
+                Tekan <strong>Scan Barcode</strong> — kamera langsung terbuka, tidak perlu pilih file. Izinkan kamera di browser. Pencahayaan cukup. Atau pakai + Pilih Produk.
+              </p>
+            </div>
+            <div>
+              <p className="font-semibold text-foreground">Telur ditimbang, harga beda-beda?</p>
+              <p className="text-muted-foreground mt-1">
+                Tambah produk Telur ke keranjang, tekan <strong>Ubah jumlah / harga</strong>, isi total sesuai timbangan. Jumlah biasanya 1.
+              </p>
+            </div>
+            <div>
+              <p className="font-semibold text-foreground">Produk tidak muncul di restock?</p>
+              <p className="text-muted-foreground mt-1">
+                Isi stok langsung di menu Produk tombol <strong>+ Isi Stok</strong>. Atau Pengeluaran → Restock, pilih nama dari daftar produk (bukan ketik bebas).
+              </p>
+            </div>
+            <div>
+              <p className="font-semibold text-foreground">Beras karung dijual eceran per kg?</p>
+              <p className="text-muted-foreground mt-1">
+                Buat 2 produk terpisah (karung & eceran). Saat pecah karung, di produk karung tekan <strong>Pindah</strong>: kurangi 1 karung, tambah 25 kg ke eceran.
               </p>
             </div>
             <div>

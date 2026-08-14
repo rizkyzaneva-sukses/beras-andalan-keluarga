@@ -39,6 +39,7 @@ export async function GET(request: NextRequest) {
       const cash = userSales.filter((p) => p.metodeBayar === "CASH").reduce((s, p) => s + p.total, 0);
       const transfer = userSales.filter((p) => p.metodeBayar === "TRANSFER").reduce((s, p) => s + p.total, 0);
       const qris = userSales.filter((p) => p.metodeBayar === "QRIS").reduce((s, p) => s + p.total, 0);
+      const hutang = userSales.filter((p) => p.metodeBayar === "HUTANG").reduce((s, p) => s + p.total, 0);
       return {
         userId: u.id,
         username: u.username,
@@ -47,6 +48,7 @@ export async function GET(request: NextRequest) {
         cashTotal: cash,
         transferTotal: transfer,
         qrisTotal: qris,
+        hutangTotal: hutang,
         total: cash + transfer + qris,
         transaksi: userSales.length,
         qty: userSales.reduce((s, p) => s + p.qty, 0),

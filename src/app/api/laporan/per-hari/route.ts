@@ -20,8 +20,9 @@ export async function GET(request: NextRequest) {
   const dateToExclusive = new Date(`${to}T00:00:00.000Z`);
   dateToExclusive.setUTCDate(dateToExclusive.getUTCDate() + 1);
 
-  const [penjualan, pembelanjaan, pembayaranUtang] = await Promise.all([
-    prisma.penjualan.findMany({ where: { tanggal: { gte: dateFrom, lt: dateToExclusive } }, orderBy: { tanggal: "asc" } }),
+  const [penjualan, pembayaranPiutang, pembelanjaan, pembayaranUtang] = await Promise.all([
+    prisma.penjualan.findMany({ where: { tanggal: { gte: dateFrom, lt: dateToExclusive }, metodeBayar: { not: "HUTANG" } }, orderBy: { tanggal: "asc" } }),
+    prisma.pembayaranPiutang.findMany({ where: { tanggal: { gte: dateFrom, lt: dateToExclusive } }, orderBy: { tanggal: "asc" } }),
     prisma.pembelanjaan.findMany({ where: { tanggal: { gte: dateFrom, lt: dateToExclusive }, statusBayar: "CASH" }, orderBy: { tanggal: "asc" } }),
     prisma.pembayaranUtang.findMany({ where: { tanggal: { gte: dateFrom, lt: dateToExclusive } }, orderBy: { tanggal: "asc" } }),
   ]);
@@ -32,6 +33,13 @@ export async function GET(request: NextRequest) {
     const d = p.tanggal.toISOString().slice(0, 10);
     const entry = dayMap.get(d) || { pendapatan: 0, pengeluaran: 0 };
     entry.pendapatan += p.total;
+    dayMap.set(d, entry);
+  }
+
+  for (const p of pembayaranPiutang) {
+    const d = p.tanggal.toISOString().slice(0, 10);
+    const entry = dayMap.get(d) || { pendapatan: 0, pengeluaran: 0 };
+    entry.pendapatan += p.jumlah;
     dayMap.set(d, entry);
   }
 

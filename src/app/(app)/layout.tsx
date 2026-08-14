@@ -22,7 +22,7 @@ const NAV_ITEMS: NavItem[] = [
   { href: "/dashboard", label: "Dashboard", short: "Home", ownerOnly: true, primary: true },
   { href: "/closing", label: "Closing", short: "Close", ownerOnly: true, primary: true },
   { href: "/pembelanjaan", label: "Pengeluaran", short: "Keluar", ownerOnly: true, primary: true },
-  { href: "/utang", label: "Utang", short: "Utang", ownerOnly: true },
+  { href: "/utang", label: "Utang & Hutang", short: "Hutang", ownerOnly: false },
   { href: "/produk", label: "Produk", short: "Produk", ownerOnly: true },
   { href: "/users", label: "User", short: "User", ownerOnly: true },
   { href: "/barcode", label: "Barcode", short: "QR", ownerOnly: true },
@@ -69,9 +69,11 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const isKasir = user.role === "KASIR";
   const visible = NAV_ITEMS.filter((item) => !item.ownerOnly || !isKasir);
   const primaryItems = isKasir
-    ? visible.filter((i) => i.href === "/pos")
+    ? visible.filter((i) => i.href === "/pos" || i.href === "/utang")
     : visible.filter((i) => i.primary);
-  const moreItems = isKasir ? [] : visible.filter((i) => !i.primary);
+  const moreItems = isKasir
+    ? visible.filter((i) => i.href !== "/pos" && i.href !== "/utang")
+    : visible.filter((i) => !i.primary);
   const moreActive = moreItems.some((i) => pathname.startsWith(i.href));
 
   return (
@@ -192,17 +194,28 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         )}
 
         {isKasir && (
-          <div
-            className="md:hidden fixed bottom-0 inset-x-0 z-40 bg-surface border-t border-border px-4 py-2"
-            style={{ paddingBottom: "calc(0.5rem + var(--safe-bottom))" }}
+          <nav
+            className="md:hidden fixed bottom-0 inset-x-0 z-40 bg-surface border-t border-border shadow-[0_-4px_20px_rgb(15_31_20/0.06)]"
+            style={{ paddingBottom: "var(--safe-bottom)" }}
           >
-            <Link
-              href="/pos"
-              className="btn-primary flex items-center justify-center w-full py-3.5 text-base"
-            >
-              Buka POS Kasir
-            </Link>
-          </div>
+            <div className="flex items-stretch">
+              {primaryItems.map((item) => {
+                const active = pathname.startsWith(item.href);
+                return (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    className={`flex-1 flex flex-col items-center justify-center gap-0.5 py-2.5 min-h-[56px] text-[11px] font-semibold transition-colors ${
+                      active ? "text-primary" : "text-muted-foreground"
+                    }`}
+                  >
+                    <span className={`w-8 h-1 rounded-full mb-0.5 ${active ? "bg-primary" : "bg-transparent"}`} />
+                    {item.short}
+                  </Link>
+                );
+              })}
+            </div>
+          </nav>
         )}
 
         {moreOpen && (

@@ -34,7 +34,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
   }
 
-  const { tanggal, kategori, namaBarang, jumlah, harga, total, statusBayar } = await request.json();
+  const { tanggal, kategori, namaBarang, jumlah, harga, total, statusBayar, produkId } = await request.json();
   if (!tanggal || !kategori || !namaBarang || !jumlah || !harga || !total) {
     return NextResponse.json({ error: "Semua field wajib diisi" }, { status: 400 });
   }
@@ -51,6 +51,7 @@ export async function POST(request: NextRequest) {
       harga,
       total,
       statusBayar: statusBayar || "CASH",
+      produkId: typeof produkId === "string" && produkId ? produkId : null,
       createdBy: session.userId,
     },
   });
@@ -73,7 +74,10 @@ export async function POST(request: NextRequest) {
 
   if (kategori === "RESTOCK") {
     const produkList = await prisma.produk.findMany({ where: { aktif: true } });
-    const matched = produkList.find((p) => namaBarang.toLowerCase().includes(p.nama.toLowerCase()));
+    const matched =
+      (produkId && produkList.find((p) => p.id === produkId)) ||
+      produkList.find((p) => p.nama.toLowerCase() === String(namaBarang).toLowerCase()) ||
+      produkList.find((p) => namaBarang.toLowerCase().includes(p.nama.toLowerCase()));
     if (matched) {
       const stokBaru = matched.stok + jumlah;
       const hppBaru = matched.stok > 0

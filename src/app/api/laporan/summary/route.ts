@@ -22,9 +22,13 @@ export async function GET(request: NextRequest) {
   const dateToExclusive = new Date(`${to}T00:00:00.000Z`);
   dateToExclusive.setUTCDate(dateToExclusive.getUTCDate() + 1);
 
-  const [penjualanAgg, pembelanjaanCashAgg, pembayaranUtangAgg, modalAgg, penjualanSampaiAgg, pembelanjaanCashSampaiAgg, pembayaranUtangSampaiAgg] = await Promise.all([
+  const [penjualanAgg, pembayaranPiutangAgg, pembelanjaanCashAgg, pembayaranUtangAgg, modalAgg, penjualanSampaiAgg, pembayaranPiutangSampaiAgg, pembelanjaanCashSampaiAgg, pembayaranUtangSampaiAgg, piutangAgg] = await Promise.all([
     prisma.penjualan.aggregate({
       _sum: { total: true },
+      where: { tanggal: { gte: dateFrom, lt: dateToExclusive }, metodeBayar: { not: "HUTANG" } },
+    }),
+    prisma.pembayaranPiutang.aggregate({
+      _sum: { jumlah: true },
       where: { tanggal: { gte: dateFrom, lt: dateToExclusive } },
     }),
     prisma.pembelanjaan.aggregate({
@@ -41,6 +45,10 @@ export async function GET(request: NextRequest) {
     }),
     prisma.penjualan.aggregate({
       _sum: { total: true },
+      where: { tanggal: { lt: dateToExclusive }, metodeBayar: { not: "HUTANG" } },
+    }),
+    prisma.pembayaranPiutang.aggregate({
+      _sum: { jumlah: true },
       where: { tanggal: { lt: dateToExclusive } },
     }),
     prisma.pembelanjaan.aggregate({
@@ -51,9 +59,12 @@ export async function GET(request: NextRequest) {
       _sum: { jumlah: true },
       where: { tanggal: { lt: dateToExclusive } },
     }),
+    prisma.piutang.aggregate({
+      _sum: { total: true, sudahDibayar: true },
+    }),
   ]);
 
-  const totalPendapatan = penjualanAgg._sum.total || 0;
+  const totalPendapatan = (penjualanAgg._sum.total || 0) + (pembayaranPiutangAgg._sum.jumlah || 0);
   // Kredit bukan arus kas saat pembelian dicatat. Arus kas baru keluar saat
   // pembayaran utang dibuat.
   const totalPengeluaran = (pembelanjaanCashAgg._sum.total || 0) + (pembayaranUtangAgg._sum.jumlah || 0);
@@ -61,8 +72,10 @@ export async function GET(request: NextRequest) {
   const totalModal = modalAgg._sum.jumlah || 0;
   const saldoKas = totalModal
     + (penjualanSampaiAgg._sum.total || 0)
+    + (pembayaranPiutangSampaiAgg._sum.jumlah || 0)
     - (pembelanjaanCashSampaiAgg._sum.total || 0)
     - (pembayaranUtangSampaiAgg._sum.jumlah || 0);
+  const totalPiutang = (piutangAgg._sum.total || 0) - (piutangAgg._sum.sudahDibayar || 0);
 
   console.info("[laporan/summary] cash-basis calculation", {
     from,
@@ -74,5 +87,5 @@ export async function GET(request: NextRequest) {
     saldoKas,
   });
 
-  return NextResponse.json({ totalPendapatan, totalPengeluaran, labaRugi, totalModal, saldoKas });
+  return NextResponse.json({ totalPendapatan, totalPengeluaran, labaRugi, totalModal, saldoKas, totalPiutang });
 }

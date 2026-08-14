@@ -1,7 +1,7 @@
 import { prisma } from "@/lib/prisma";
 
 export type AuditAction = "CREATE" | "UPDATE" | "DELETE";
-export type AuditEntity = "PENJUALAN" | "PEMBELANJAAN" | "MODAL" | "PRODUK" | "USER" | "UTANG";
+export type AuditEntity = "PENJUALAN" | "PEMBELANJAAN" | "MODAL" | "PRODUK" | "USER" | "UTANG" | "PIUTANG" | "STOK";
 
 type WriteAuditInput = {
   entityType: AuditEntity;

@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { PembelanjaanEntry, KategoriPembelanjaan } from "@/types";
+import { PembelanjaanEntry, KategoriPembelanjaan, Product } from "@/types";
+import { digitsOnly, formatRibuan, formatRupiah } from "@/lib/money";
 
 type RangeKey = "today" | "week" | "month" | "custom";
 
@@ -10,7 +11,8 @@ export default function PembelanjaanPage() {
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
-  const [form, setForm] = useState({ tanggal: new Date().toISOString().slice(0, 10), kategori: "RESTOCK" as KategoriPembelanjaan, namaBarang: "", jumlah: "", harga: "", statusBayar: "CASH" as "CASH" | "KREDIT" });
+  const [form, setForm] = useState({ tanggal: new Date().toISOString().slice(0, 10), kategori: "RESTOCK" as KategoriPembelanjaan, namaBarang: "", jumlah: "", harga: "", statusBayar: "CASH" as "CASH" | "KREDIT", produkId: "" });
+  const [produkList, setProdukList] = useState<Product[]>([]);
   const [error, setError] = useState("");
   const [range, setRange] = useState<RangeKey>("today");
   const [dateFrom, setDateFrom] = useState(new Date().toISOString().slice(0, 10));
@@ -38,6 +40,14 @@ export default function PembelanjaanPage() {
   }
 
   useEffect(() => { fetchData(); }, [range, dateFrom, dateTo]);
+  useEffect(() => {
+    fetch("/api/produk")
+      .then((r) => r.json())
+      .then((data) => {
+        if (Array.isArray(data)) setProdukList(data);
+      })
+      .catch(() => {});
+  }, []);
 
   async function fetchSuggestions(q: string) {
     if (!q) { setSuggestions([]); setShowSuggest(false); return; }
@@ -48,18 +58,18 @@ export default function PembelanjaanPage() {
   }
 
   function openAdd() {
-    setEditId(null); setForm({ tanggal: new Date().toISOString().slice(0, 10), kategori: "RESTOCK", namaBarang: "", jumlah: "", harga: "", statusBayar: "CASH" });
+    setEditId(null); setForm({ tanggal: new Date().toISOString().slice(0, 10), kategori: "RESTOCK", namaBarang: "", jumlah: "", harga: "", statusBayar: "CASH", produkId: "" });
     setShowForm(true); setError(""); setSuggestions([]); setShowSuggest(false);
   }
 
   function openEdit(p: PembelanjaanEntry) {
-    setEditId(p.id); setForm({ tanggal: p.tanggal.slice(0, 10), kategori: p.kategori, namaBarang: p.namaBarang, jumlah: String(p.jumlah), harga: String(p.harga), statusBayar: p.statusBayar });
+    setEditId(p.id); setForm({ tanggal: p.tanggal.slice(0, 10), kategori: p.kategori, namaBarang: p.namaBarang, jumlah: String(p.jumlah), harga: String(p.harga), statusBayar: p.statusBayar, produkId: p.produkId || "" });
     setShowForm(true); setError(""); setSuggestions([]); setShowSuggest(false);
   }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault(); setError("");
-    const jumlah = Number(form.jumlah); const harga = Number(form.harga); const total = jumlah * harga;
+    const jumlah = Number(digitsOnly(form.jumlah)); const harga = Number(digitsOnly(form.harga)); const total = jumlah * harga;
     const body = { ...form, jumlah, harga, total };
     const url = editId ? `/api/pembelanjaan/${editId}` : "/api/pembelanjaan"; const method = editId ? "PUT" : "POST";
     const res = await fetch(url, { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
@@ -68,9 +78,7 @@ export default function PembelanjaanPage() {
 
   async function handleDelete(id: string) { if (!confirm("Hapus catatan pengeluaran ini?")) return; await fetch(`/api/pembelanjaan/${id}`, { method: "DELETE" }); fetchData(); }
 
-  function formatRupiah(n: number) { return new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", minimumFractionDigits: 0 }).format(n); }
-
-  const kategoryLabel: Record<string, string> = { RESTOCK: "Restock Beras", OPERASIONAL: "Operasional", LAINNYA: "Lainnya" };
+  const kategoryLabel: Record<string, string> = { RESTOCK: "Restock Barang", OPERASIONAL: "Operasional", LAINNYA: "Lainnya" };
   const rangeLabels: Record<RangeKey, string> = { today: "Hari Ini", week: "Minggu Ini", month: "Bulan Ini", custom: "Custom" };
 
   const total = data.reduce((s, p) => s + p.total, 0);
@@ -105,29 +113,56 @@ export default function PembelanjaanPage() {
         <form onSubmit={handleSubmit} className="bg-white border border-border rounded-xl p-4 space-y-3.5 shadow-sm">
           <h3 className="font-semibold text-[15px]">{editId ? "Edit Pengeluaran" : "Tambah Pengeluaran"}</h3>
           <div><label className="block text-sm font-medium mb-1">Tanggal</label><input type="date" value={form.tanggal} onChange={(e) => setForm({ ...form, tanggal: e.target.value })} required className="w-full px-3 py-2.5 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary" /></div>
-          <div><label className="block text-sm font-medium mb-1">Kategori</label><select value={form.kategori} onChange={(e) => setForm({ ...form, kategori: e.target.value as KategoriPembelanjaan })} className="w-full px-3 py-2.5 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary bg-white"><option value="RESTOCK">Restock Beras</option><option value="OPERASIONAL">Operasional</option><option value="LAINNYA">Lainnya</option></select></div>
+          <div><label className="block text-sm font-medium mb-1">Kategori</label><select value={form.kategori} onChange={(e) => setForm({ ...form, kategori: e.target.value as KategoriPembelanjaan, produkId: "", namaBarang: e.target.value === "RESTOCK" ? form.namaBarang : form.namaBarang })} className="w-full px-3 py-2.5 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary bg-white"><option value="RESTOCK">Restock Barang</option><option value="OPERASIONAL">Operasional</option><option value="LAINNYA">Lainnya</option></select></div>
           <div><label className="block text-sm font-medium mb-1">Status Bayar</label>
             <div className="flex gap-2">
               <button type="button" onClick={() => setForm({ ...form, statusBayar: "CASH" })} className={`flex-1 py-2.5 rounded-lg text-sm font-medium border transition-colors ${form.statusBayar === "CASH" ? "bg-green-600 text-white border-green-600 shadow-sm" : "border-border text-muted-foreground hover:bg-muted active:bg-border"}`}>Cash</button>
               <button type="button" onClick={() => setForm({ ...form, statusBayar: "KREDIT" })} className={`flex-1 py-2.5 rounded-lg text-sm font-medium border transition-colors ${form.statusBayar === "KREDIT" ? "bg-amber-600 text-white border-amber-600 shadow-sm" : "border-border text-muted-foreground hover:bg-muted active:bg-border"}`}>Kredit</button>
             </div>
           </div>
-          <div className="relative">
-            <label className="block text-sm font-medium mb-1">Nama Barang/Biaya</label>
-            <input type="text" value={form.namaBarang} onChange={(e) => { setForm({ ...form, namaBarang: e.target.value }); fetchSuggestions(e.target.value); }} onFocus={() => { if (suggestions.length > 0) setShowSuggest(true); }} onBlur={() => setTimeout(() => setShowSuggest(false), 200)} required className="w-full px-3 py-2.5 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary" placeholder="Ketik nama, pilih dari history atau tulis baru" />
-            {showSuggest && suggestions.length > 0 && (
-              <div className="absolute z-20 left-0 right-0 mt-0.5 bg-white border border-border rounded-lg shadow-lg max-h-44 overflow-y-auto">
-                {suggestions.map((name) => (
-                  <button key={name} type="button" onMouseDown={(e) => { e.preventDefault(); setForm({ ...form, namaBarang: name }); setShowSuggest(false); }} className={`w-full text-left px-3 py-2.5 text-sm hover:bg-muted transition-colors border-b border-border last:border-b-0 ${form.namaBarang === name ? "bg-primary/5 font-medium" : ""}`}>{name}</button>
-                ))}
-              </div>
-            )}
-          </div>
+          {form.kategori === "RESTOCK" ? (
+            <div>
+              <label className="block text-sm font-medium mb-1">Nama Produk (dari Master Produk)</label>
+              {produkList.length === 0 ? (
+                <p className="text-sm text-danger">Belum ada produk. Tambah dulu di menu Produk, lalu isi stok di sini.</p>
+              ) : (
+                <select
+                  value={form.produkId}
+                  required
+                  onChange={(e) => {
+                    const p = produkList.find((x) => x.id === e.target.value);
+                    setForm({ ...form, produkId: e.target.value, namaBarang: p?.nama || "", harga: p ? String(p.hargaBeli) : form.harga });
+                  }}
+                  className="w-full px-3 py-2.5 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary bg-white"
+                >
+                  <option value="">Pilih produk...</option>
+                  {produkList.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.nama} · stok {p.stok} {p.satuan}
+                    </option>
+                  ))}
+                </select>
+              )}
+              <p className="text-[11px] text-muted-foreground mt-1">Semua produk yang sudah dibuat (beserta barcode) muncul di sini.</p>
+            </div>
+          ) : (
+            <div className="relative">
+              <label className="block text-sm font-medium mb-1">Nama Barang/Biaya</label>
+              <input type="text" value={form.namaBarang} onChange={(e) => { setForm({ ...form, namaBarang: e.target.value }); fetchSuggestions(e.target.value); }} onFocus={() => { if (suggestions.length > 0) setShowSuggest(true); }} onBlur={() => setTimeout(() => setShowSuggest(false), 200)} required className="w-full px-3 py-2.5 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary" placeholder="Ketik nama, pilih dari history atau tulis baru" />
+              {showSuggest && suggestions.length > 0 && (
+                <div className="absolute z-20 left-0 right-0 mt-0.5 bg-white border border-border rounded-lg shadow-lg max-h-44 overflow-y-auto">
+                  {suggestions.map((name) => (
+                    <button key={name} type="button" onMouseDown={(e) => { e.preventDefault(); setForm({ ...form, namaBarang: name }); setShowSuggest(false); }} className={`w-full text-left px-3 py-2.5 text-sm hover:bg-muted transition-colors border-b border-border last:border-b-0 ${form.namaBarang === name ? "bg-primary/5 font-medium" : ""}`}>{name}</button>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
           <div className="grid grid-cols-2 gap-3">
-            <div><label className="block text-sm font-medium mb-1">Jumlah</label><input type="number" value={form.jumlah} onChange={(e) => setForm({ ...form, jumlah: e.target.value })} required className="w-full px-3 py-2.5 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary" min="1" inputMode="numeric" /></div>
-            <div><label className="block text-sm font-medium mb-1">Harga Satuan (Rp)</label><input type="number" value={form.harga} onChange={(e) => setForm({ ...form, harga: e.target.value })} required className="w-full px-3 py-2.5 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary" inputMode="numeric" /></div>
+            <div><label className="block text-sm font-medium mb-1">Jumlah</label><input type="text" value={form.jumlah} onChange={(e) => setForm({ ...form, jumlah: digitsOnly(e.target.value) })} required className="w-full px-3 py-2.5 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary font-mono" inputMode="numeric" /></div>
+            <div><label className="block text-sm font-medium mb-1">Harga Satuan (Rp)</label><input type="text" value={formatRibuan(digitsOnly(form.harga))} onChange={(e) => setForm({ ...form, harga: digitsOnly(e.target.value) })} required className="w-full px-3 py-2.5 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary font-mono" inputMode="numeric" /></div>
           </div>
-          {form.jumlah && form.harga && (<div className="bg-red-50 rounded-xl p-3 text-center border border-red-200"><span className="text-xs text-red-700">Total: </span><span className="font-mono font-bold text-xl text-red-800">{formatRupiah(Number(form.jumlah) * Number(form.harga))}</span></div>)}
+          {form.jumlah && form.harga && (<div className="bg-red-50 rounded-xl p-3 text-center border border-red-200"><span className="text-xs text-red-700">Total: </span><span className="font-mono font-bold text-xl text-red-800">{formatRupiah(Number(digitsOnly(form.jumlah)) * Number(digitsOnly(form.harga)))}</span></div>)}
           {error && <p className="text-danger text-sm font-medium">{error}</p>}
           <div className="flex gap-2 pt-1">
             <button type="submit" className="flex-1 bg-primary text-white py-3 rounded-lg font-semibold hover:bg-primary-hover active:bg-primary-hover/80 transition-colors shadow-sm">Simpan</button>
