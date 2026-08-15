@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/session";
 import { diffFields, writeAudit } from "@/lib/audit";
+import { isProdukTimbang, isValidQty, lineTotal, toQty } from "@/lib/qty";
 
 export async function PUT(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const session = await getSession();
@@ -13,8 +14,16 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
   const oldRecord = await prisma.pembelanjaan.findUnique({ where: { id } });
   if (!oldRecord) return NextResponse.json({ error: "Data tidak ditemukan" }, { status: 404 });
 
-  const { tanggal, kategori, namaBarang, jumlah, harga, total, statusBayar, produkId } = await request.json();
-  if (!Number.isInteger(jumlah) || jumlah <= 0 || !Number.isInteger(harga) || harga <= 0 || total !== jumlah * harga) {
+  const { tanggal, kategori, namaBarang, jumlah: rawJumlah, harga, total, statusBayar, produkId } = await request.json();
+  const jumlah = toQty(rawJumlah);
+  const allowFraction = isProdukTimbang(namaBarang);
+  if (
+    !isValidQty(jumlah, { allowFraction }) ||
+    !Number.isInteger(harga) ||
+    harga <= 0 ||
+    !Number.isInteger(total) ||
+    total !== lineTotal(jumlah, harga)
+  ) {
     return NextResponse.json({ error: "Perhitungan pengeluaran tidak valid" }, { status: 400 });
   }
 

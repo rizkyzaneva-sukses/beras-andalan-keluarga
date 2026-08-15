@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/session";
 import { writeAudit } from "@/lib/audit";
+import { toQty } from "@/lib/qty";
 
 export async function GET() {
   const session = await getSession();
@@ -13,7 +14,7 @@ export async function GET() {
     where: { aktif: true },
     orderBy: { createdAt: "desc" },
   });
-  return NextResponse.json(produk);
+  return NextResponse.json(produk.map((p) => ({ ...p, stok: toQty(p.stok) })));
 }
 
 export async function POST(request: NextRequest) {

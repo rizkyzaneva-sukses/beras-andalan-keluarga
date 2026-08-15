@@ -13,6 +13,19 @@ export interface Product {
   aktif: boolean;
 }
 
+export interface StokAdjustmentEntry {
+  id: string;
+  produkId: string;
+  produkNama: string;
+  satuan: string;
+  stokSistem: number;
+  stokFisik: number;
+  selisih: number;
+  alasan: string;
+  createdByUsername: string;
+  createdAt: string;
+}
+
 export interface ModalEntry {
   id: string;
   jumlah: number;

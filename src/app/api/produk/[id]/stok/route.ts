@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/session";
 import { writeAudit } from "@/lib/audit";
+import { formatQty, hasEnoughStock, isProdukTimbang, isValidQty, lineTotal, toQty } from "@/lib/qty";
 
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const session = await getSession();
@@ -10,26 +11,28 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   }
 
   const { id } = await params;
-  const { arah, jumlah, harga, statusBayar, catatan } = await request.json();
-  if (!["tambah", "kurang"].includes(arah) || !Number.isInteger(jumlah) || jumlah <= 0) {
-    return NextResponse.json({ error: "Jumlah stok tidak valid" }, { status: 400 });
-  }
-
+  const { arah, jumlah: rawJumlah, harga, statusBayar, catatan } = await request.json();
+  const jumlah = toQty(rawJumlah);
   const produk = await prisma.produk.findUnique({ where: { id } });
   if (!produk || !produk.aktif) {
     return NextResponse.json({ error: "Produk tidak ditemukan" }, { status: 404 });
   }
 
-  if (arah === "kurang" && produk.stok < jumlah) {
-    return NextResponse.json({ error: `Stok ${produk.nama} hanya ${produk.stok}` }, { status: 400 });
+  if (!["tambah", "kurang"].includes(arah) || !isValidQty(jumlah, { allowFraction: isProdukTimbang(produk.nama) })) {
+    return NextResponse.json({ error: "Jumlah stok tidak valid" }, { status: 400 });
+  }
+
+  const stokLama = toQty(produk.stok);
+  if (arah === "kurang" && !hasEnoughStock(stokLama, jumlah)) {
+    return NextResponse.json({ error: `Stok ${produk.nama} hanya ${formatQty(stokLama)} ${produk.satuan}` }, { status: 400 });
   }
 
   if (arah === "tambah") {
     const hargaBeli = Number.isInteger(harga) && harga > 0 ? harga : null;
-    const stokBaru = produk.stok + jumlah;
+    const stokBaru = toQty(stokLama + jumlah);
     const hppBaru = hargaBeli
-      ? produk.stok > 0
-        ? Math.round(((produk.stok * (produk.hppRataRata || produk.hargaBeli)) + (jumlah * hargaBeli)) / stokBaru)
+      ? stokLama > 0
+        ? Math.round((stokLama * (produk.hppRataRata || produk.hargaBeli) + jumlah * hargaBeli) / stokBaru)
         : hargaBeli
       : produk.hppRataRata;
 
@@ -46,7 +49,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
             namaBarang: produk.nama,
             jumlah,
             harga: hargaBeli,
-            total: jumlah * hargaBeli,
+            total: lineTotal(jumlah, hargaBeli),
             statusBayar: statusBayar === "KREDIT" ? "KREDIT" : "CASH",
             produkId: id,
             createdBy: session.userId!,
@@ -61,14 +64,15 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     });
   }
 
+  const stokBaru = arah === "tambah" ? toQty(stokLama + jumlah) : toQty(stokLama - jumlah);
   await writeAudit({
     entityType: "STOK",
     entityId: id,
     action: "UPDATE",
-    oldData: { nama: produk.nama, stok: produk.stok },
+    oldData: { nama: produk.nama, stok: stokLama },
     newData: {
       nama: produk.nama,
-      stok: arah === "tambah" ? produk.stok + jumlah : produk.stok - jumlah,
+      stok: stokBaru,
       arah,
       jumlah,
       catatan: catatan || null,
@@ -77,5 +81,5 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   });
 
   const updated = await prisma.produk.findUnique({ where: { id } });
-  return NextResponse.json(updated);
+  return NextResponse.json(updated ? { ...updated, stok: toQty(updated.stok) } : updated);
 }

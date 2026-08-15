@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/session";
 import { diffFields, writeAudit } from "@/lib/audit";
+import { isProdukTimbang, isValidQty, lineTotal, toQty } from "@/lib/qty";
 
 export async function PUT(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const session = await getSession();
@@ -13,15 +14,26 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
   const oldRecord = await prisma.penjualan.findUnique({ where: { id } });
   if (!oldRecord) return NextResponse.json({ error: "Data tidak ditemukan" }, { status: 404 });
 
-  const { produkId, qty, hargaJual, total, metodeBayar, hargaDisesuaikan } = await request.json();
-  if (!Number.isInteger(qty) || qty <= 0 || !Number.isInteger(hargaJual) || hargaJual <= 0 || total !== qty * hargaJual) {
+  const { produkId, qty: rawQty, hargaJual, total, metodeBayar, hargaDisesuaikan } = await request.json();
+  const produkCek = await prisma.produk.findUnique({ where: { id: produkId || oldRecord.produkId }, select: { nama: true } });
+  const qty = toQty(rawQty);
+  const allowFraction = Boolean(produkCek && isProdukTimbang(produkCek.nama));
+  if (
+    !isValidQty(qty, { allowFraction }) ||
+    !Number.isInteger(hargaJual) ||
+    hargaJual <= 0 ||
+    !Number.isInteger(total) ||
+    total <= 0 ||
+    (!hargaDisesuaikan && total !== lineTotal(qty, hargaJual))
+  ) {
     return NextResponse.json({ error: "Perhitungan penjualan tidak valid" }, { status: 400 });
   }
 
   const newRecord = await prisma.penjualan.update({ where: { id }, data: { produkId, qty, hargaJual, total, metodeBayar, hargaDisesuaikan } });
 
-  if (oldRecord.qty !== qty) {
-    const diff = oldRecord.qty - qty;
+  const qtyLama = toQty(oldRecord.qty);
+  if (qtyLama !== qty) {
+    const diff = toQty(qtyLama - qty);
     await prisma.produk.update({ where: { id: oldRecord.produkId }, data: { stok: { increment: diff } } }).catch(() => {});
   }
 

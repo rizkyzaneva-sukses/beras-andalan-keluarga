@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { PembelanjaanEntry, KategoriPembelanjaan, Product } from "@/types";
 import { digitsOnly, formatRibuan, formatRupiah } from "@/lib/money";
+import { formatQty, isProdukTimbang, lineTotal, parseQtyInput, sanitizeQtyInput } from "@/lib/qty";
 
 type RangeKey = "today" | "week" | "month" | "custom";
 
@@ -69,7 +70,11 @@ export default function PembelanjaanPage() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault(); setError("");
-    const jumlah = Number(digitsOnly(form.jumlah)); const harga = Number(digitsOnly(form.harga)); const total = jumlah * harga;
+    const restock = produkList.find((p) => p.id === form.produkId);
+    const fraction = form.kategori === "RESTOCK" && restock && isProdukTimbang(restock.nama);
+    const jumlah = fraction ? parseQtyInput(form.jumlah) : Number(digitsOnly(form.jumlah));
+    const harga = Number(digitsOnly(form.harga));
+    const total = lineTotal(jumlah, harga);
     const body = { ...form, jumlah, harga, total };
     const url = editId ? `/api/pembelanjaan/${editId}` : "/api/pembelanjaan"; const method = editId ? "PUT" : "POST";
     const res = await fetch(url, { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
@@ -138,7 +143,7 @@ export default function PembelanjaanPage() {
                   <option value="">Pilih produk...</option>
                   {produkList.map((p) => (
                     <option key={p.id} value={p.id}>
-                      {p.nama} · stok {p.stok} {p.satuan}
+                      {p.nama} · stok {formatQty(p.stok)} {p.satuan}
                     </option>
                   ))}
                 </select>
@@ -159,10 +164,10 @@ export default function PembelanjaanPage() {
             </div>
           )}
           <div className="grid grid-cols-2 gap-3">
-            <div><label className="block text-sm font-medium mb-1">Jumlah</label><input type="text" value={form.jumlah} onChange={(e) => setForm({ ...form, jumlah: digitsOnly(e.target.value) })} required className="w-full px-3 py-2.5 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary font-mono" inputMode="numeric" /></div>
+            <div><label className="block text-sm font-medium mb-1">Jumlah</label><input type="text" value={form.jumlah} onChange={(e) => { const restock = produkList.find((p) => p.id === form.produkId); const fraction = form.kategori === "RESTOCK" && restock && isProdukTimbang(restock.nama); setForm({ ...form, jumlah: fraction ? sanitizeQtyInput(e.target.value) : digitsOnly(e.target.value) }); }} required className="w-full px-3 py-2.5 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary font-mono" inputMode={form.kategori === "RESTOCK" && produkList.find((p) => p.id === form.produkId && isProdukTimbang(p.nama)) ? "decimal" : "numeric"} placeholder={form.kategori === "RESTOCK" && produkList.find((p) => p.id === form.produkId && isProdukTimbang(p.nama)) ? "0,7 atau 10" : ""} /></div>
             <div><label className="block text-sm font-medium mb-1">Harga Satuan (Rp)</label><input type="text" value={formatRibuan(digitsOnly(form.harga))} onChange={(e) => setForm({ ...form, harga: digitsOnly(e.target.value) })} required className="w-full px-3 py-2.5 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary font-mono" inputMode="numeric" /></div>
           </div>
-          {form.jumlah && form.harga && (<div className="bg-red-50 rounded-xl p-3 text-center border border-red-200"><span className="text-xs text-red-700">Total: </span><span className="font-mono font-bold text-xl text-red-800">{formatRupiah(Number(digitsOnly(form.jumlah)) * Number(digitsOnly(form.harga)))}</span></div>)}
+          {form.jumlah && form.harga && (<div className="bg-red-50 rounded-xl p-3 text-center border border-red-200"><span className="text-xs text-red-700">Total: </span><span className="font-mono font-bold text-xl text-red-800">{formatRupiah(lineTotal(produkList.find((p) => p.id === form.produkId && isProdukTimbang(p.nama)) ? parseQtyInput(form.jumlah) : Number(digitsOnly(form.jumlah)), Number(digitsOnly(form.harga))))}</span></div>)}
           {error && <p className="text-danger text-sm font-medium">{error}</p>}
           <div className="flex gap-2 pt-1">
             <button type="submit" className="flex-1 bg-primary text-white py-3 rounded-lg font-semibold hover:bg-primary-hover active:bg-primary-hover/80 transition-colors shadow-sm">Simpan</button>
@@ -181,7 +186,7 @@ export default function PembelanjaanPage() {
               <div className="flex flex-wrap gap-x-2 gap-y-0.5 text-xs text-muted-foreground mt-0.5">
                 <span className="px-1.5 py-0.5 bg-muted rounded text-[11px] font-medium">{kategoryLabel[p.kategori]}</span>
                 {p.statusBayar === "KREDIT" && <span className="px-1.5 py-0.5 bg-amber-100 text-amber-700 rounded text-[11px] font-medium">Kredit</span>}
-                <span>{p.jumlah} &times; {formatRupiah(p.harga)}</span>
+                <span>{formatQty(p.jumlah)} &times; {formatRupiah(p.harga)}</span>
                 <span>{new Date(p.tanggal).toLocaleDateString("id-ID", { day: "numeric", month: "short" })}</span>
               </div>
             </div>

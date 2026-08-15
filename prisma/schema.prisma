@@ -45,6 +45,7 @@ model User {
   pembayaranUtang   PembayaranUtang[]
   piutang           Piutang[]
   pembayaranPiutang PembayaranPiutang[]
+  stokAdjustment    StokAdjustment[]
 
   @@map("user")
 }
@@ -55,13 +56,14 @@ model Produk {
   satuan       String
   hargaBeli    Int      @map("harga_beli")
   hargaJual    Int      @map("harga_jual")
-  stok         Int      @default(0)
+  stok         Decimal  @default(0) @db.Decimal(12, 3)
   hppRataRata  Int      @default(0) @map("hpp_rata_rata")
   aktif        Boolean  @default(true)
   createdAt    DateTime @default(now()) @map("created_at")
 
   penjualan    Penjualan[]
   pembelanjaan Pembelanjaan[]
+  stokAdjustment StokAdjustment[]
 
   @@map("produk")
 }
@@ -84,7 +86,7 @@ model Pembelanjaan {
   tanggal       DateTime
   kategori      KategoriPembelanjaan
   namaBarang    String               @map("nama_barang")
-  jumlah        Int
+  jumlah        Decimal              @db.Decimal(12, 3)
   harga         Int
   total         Int
   statusBayar   StatusBayar          @default(CASH) @map("status_bayar")
@@ -104,7 +106,7 @@ model Penjualan {
   id                String      @id @default(cuid())
   tanggal           DateTime
   produkId          String      @map("produk_id")
-  qty               Int
+  qty               Decimal     @db.Decimal(12, 3)
   hargaJual         Int         @map("harga_jual")
   total             Int
   metodeBayar       MetodeBayar @map("metode_bayar")
@@ -165,6 +167,24 @@ model Piutang {
   pembayaran PembayaranPiutang[]
 
   @@map("piutang")
+}
+
+model StokAdjustment {
+  id         String   @id @default(cuid())
+  produkId   String   @map("produk_id")
+  stokSistem Decimal  @map("stok_sistem") @db.Decimal(12, 3)
+  stokFisik  Decimal  @map("stok_fisik") @db.Decimal(12, 3)
+  selisih    Decimal  @db.Decimal(12, 3)
+  alasan     String
+  createdBy  String   @map("created_by")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  produk Produk @relation(fields: [produkId], references: [id])
+  user   User   @relation(fields: [createdBy], references: [id])
+
+  @@index([produkId])
+  @@index([createdAt])
+  @@map("stok_adjustment")
 }
 
 model PembayaranPiutang {

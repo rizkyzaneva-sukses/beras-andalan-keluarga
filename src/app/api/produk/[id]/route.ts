@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/session";
 import { diffFields, writeAudit } from "@/lib/audit";
+import { toQty } from "@/lib/qty";
 
 export async function PUT(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const session = await getSession();
@@ -35,7 +36,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       userId: session.userId,
     });
   }
-  return NextResponse.json(produk);
+  return NextResponse.json({ ...produk, stok: toQty(produk.stok) });
 }
 
 export async function DELETE(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {

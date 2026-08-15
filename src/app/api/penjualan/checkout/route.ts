@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/session";
 import { writeAudit } from "@/lib/audit";
+import { formatQty, hasEnoughStock, isProdukTimbang, isValidQty, lineTotal, toQty } from "@/lib/qty";
 
 type CheckoutItem = {
   produkId: string;
@@ -30,28 +31,36 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Nama pelanggan wajib diisi untuk hutang" }, { status: 400 });
   }
 
-  for (const item of items as CheckoutItem[]) {
-    if (
-      !item.produkId ||
-      !Number.isInteger(item.qty) ||
-      item.qty <= 0 ||
-      !Number.isInteger(item.hargaJual) ||
-      item.hargaJual <= 0 ||
-      item.total !== item.qty * item.hargaJual
-    ) {
-      return NextResponse.json({ error: "Perhitungan penjualan tidak valid" }, { status: 400 });
-    }
-  }
-
   const produkIds = [...new Set((items as CheckoutItem[]).map((i) => i.produkId))];
   const produkList = await prisma.produk.findMany({
     where: { id: { in: produkIds } },
-    select: { id: true, nama: true },
+    select: { id: true, nama: true, satuan: true, stok: true },
   });
   if (produkList.length !== produkIds.length) {
     return NextResponse.json({ error: "Ada produk yang tidak ditemukan" }, { status: 400 });
   }
+  const produkById = new Map(produkList.map((p) => [p.id, p]));
   const namaById = new Map(produkList.map((p) => [p.id, p.nama]));
+
+  for (const item of items as CheckoutItem[]) {
+    const produk = produkById.get(item.produkId);
+    const qty = toQty(item.qty);
+    const allowFraction = Boolean(produk && isProdukTimbang(produk.nama));
+    if (
+      !item.produkId ||
+      !produk ||
+      !isValidQty(qty, { allowFraction }) ||
+      !Number.isInteger(item.hargaJual) ||
+      item.hargaJual <= 0 ||
+      !Number.isInteger(item.total) ||
+      item.total <= 0
+    ) {
+      return NextResponse.json({ error: "Perhitungan penjualan tidak valid" }, { status: 400 });
+    }
+    if (!item.hargaDisesuaikan && item.total !== lineTotal(qty, item.hargaJual)) {
+      return NextResponse.json({ error: "Perhitungan penjualan tidak valid" }, { status: 400 });
+    }
+  }
 
   const cartTotal = (items as CheckoutItem[]).reduce((s, i) => s + i.total, 0);
 
@@ -71,12 +80,28 @@ export async function POST(request: NextRequest) {
       }
 
       const created = [];
+      const needByProduk = new Map<string, number>();
       for (const item of items as CheckoutItem[]) {
+        const qty = toQty(item.qty);
+        needByProduk.set(item.produkId, toQty((needByProduk.get(item.produkId) || 0) + qty));
+      }
+
+      for (const [produkId, need] of needByProduk) {
+        const current = await tx.produk.findUnique({ where: { id: produkId }, select: { nama: true, satuan: true, stok: true } });
+        if (!current || !hasEnoughStock(current.stok, need)) {
+          const sisa = formatQty(current?.stok ?? 0);
+          const satuan = current?.satuan || "";
+          throw new Error(`STOK:${current?.nama || "Produk"} hanya ${sisa}${satuan ? ` ${satuan}` : ""}`);
+        }
+      }
+
+      for (const item of items as CheckoutItem[]) {
+        const qty = toQty(item.qty);
         const penjualan = await tx.penjualan.create({
           data: {
             tanggal: new Date(tanggal),
             produkId: item.produkId,
-            qty: item.qty,
+            qty,
             hargaJual: item.hargaJual,
             total: item.total,
             metodeBayar,
@@ -88,7 +113,7 @@ export async function POST(request: NextRequest) {
         });
         await tx.produk.update({
           where: { id: item.produkId },
-          data: { stok: { decrement: item.qty } },
+          data: { stok: { decrement: qty } },
         });
         created.push(penjualan);
       }
@@ -103,7 +128,7 @@ export async function POST(request: NextRequest) {
         action: "CREATE",
         newData: {
           produkNama: namaById.get(p.produkId),
-          qty: p.qty,
+          qty: toQty(p.qty),
           hargaJual: p.hargaJual,
           total: p.total,
           metodeBayar: p.metodeBayar,
@@ -124,8 +149,18 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    return NextResponse.json(result, { status: 201 });
-  } catch {
+    return NextResponse.json(
+      {
+        ...result,
+        penjualan: result.penjualan.map((p) => ({ ...p, qty: toQty(p.qty) })),
+      },
+      { status: 201 }
+    );
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "";
+    if (message.startsWith("STOK:")) {
+      return NextResponse.json({ error: `Stok ${message.slice(5)}` }, { status: 400 });
+    }
     return NextResponse.json({ error: "Gagal menyimpan transaksi" }, { status: 500 });
   }
 }

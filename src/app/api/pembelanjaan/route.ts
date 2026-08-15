@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/session";
 import { writeAudit } from "@/lib/audit";
+import { isProdukTimbang, isValidQty, lineTotal, toQty } from "@/lib/qty";
 
 export async function GET(request: NextRequest) {
   const session = await getSession();
@@ -25,7 +26,7 @@ export async function GET(request: NextRequest) {
     where,
     orderBy: { tanggal: "desc" },
   });
-  return NextResponse.json({ data });
+  return NextResponse.json({ data: data.map((p) => ({ ...p, jumlah: toQty(p.jumlah) })) });
 }
 
 export async function POST(request: NextRequest) {
@@ -34,11 +35,21 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
   }
 
-  const { tanggal, kategori, namaBarang, jumlah, harga, total, statusBayar, produkId } = await request.json();
-  if (!tanggal || !kategori || !namaBarang || !jumlah || !harga || !total) {
+  const { tanggal, kategori, namaBarang, jumlah: rawJumlah, harga, total, statusBayar, produkId } = await request.json();
+  if (!tanggal || !kategori || !namaBarang || !rawJumlah || !harga || !total) {
     return NextResponse.json({ error: "Semua field wajib diisi" }, { status: 400 });
   }
-  if (!Number.isInteger(jumlah) || jumlah <= 0 || !Number.isInteger(harga) || harga <= 0 || total !== jumlah * harga) {
+  const jumlah = toQty(rawJumlah);
+  const linkedId = typeof produkId === "string" && produkId ? produkId : null;
+  const linkedProduk = linkedId ? await prisma.produk.findUnique({ where: { id: linkedId }, select: { nama: true } }) : null;
+  const allowFraction = isProdukTimbang(namaBarang) || Boolean(linkedProduk && isProdukTimbang(linkedProduk.nama));
+  if (
+    !isValidQty(jumlah, { allowFraction }) ||
+    !Number.isInteger(harga) ||
+    harga <= 0 ||
+    !Number.isInteger(total) ||
+    total !== lineTotal(jumlah, harga)
+  ) {
     return NextResponse.json({ error: "Perhitungan pengeluaran tidak valid" }, { status: 400 });
   }
 
@@ -51,7 +62,7 @@ export async function POST(request: NextRequest) {
       harga,
       total,
       statusBayar: statusBayar || "CASH",
-      produkId: typeof produkId === "string" && produkId ? produkId : null,
+      produkId: linkedId,
       createdBy: session.userId,
     },
   });
@@ -79,9 +90,10 @@ export async function POST(request: NextRequest) {
       produkList.find((p) => p.nama.toLowerCase() === String(namaBarang).toLowerCase()) ||
       produkList.find((p) => namaBarang.toLowerCase().includes(p.nama.toLowerCase()));
     if (matched) {
-      const stokBaru = matched.stok + jumlah;
-      const hppBaru = matched.stok > 0
-        ? Math.round(((matched.stok * (matched.hppRataRata || matched.hargaBeli)) + (jumlah * harga)) / stokBaru)
+      const stokLama = toQty(matched.stok);
+      const stokBaru = toQty(stokLama + jumlah);
+      const hppBaru = stokLama > 0
+        ? Math.round((stokLama * (matched.hppRataRata || matched.hargaBeli) + jumlah * harga) / stokBaru)
         : harga;
       await prisma.produk.update({
         where: { id: matched.id },

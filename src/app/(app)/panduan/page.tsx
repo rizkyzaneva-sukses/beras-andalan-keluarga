@@ -164,7 +164,7 @@ export default function PanduanPage() {
               Atur jumlah di keranjang pakai tombol <strong>− / +</strong>. Hapus item dengan tombol ×.
             </Step>
             <Step n={3}>
-              Untuk telur ditimbang / harga khusus: tekan <strong>Ubah jumlah / harga</strong>, isi total sesuai hasil timbangan.
+              Untuk telur: pilih <strong>1/4, 1/3, 1/2, 1 kg</strong> atau ketik berat (mis. 0,7). Stok potong sesuai kg, bukan selalu 1.
             </Step>
             <Step n={4}>
               Pilih metode bayar: <strong>Tunai</strong>, <strong>QRIS</strong>, <strong>Transfer</strong>, atau <strong>Hutang</strong>.
@@ -193,15 +193,21 @@ export default function PanduanPage() {
             </Step>
             <Step n={2}>Isi nama, satuan (kg/karung/liter), harga beli, harga jual.</Step>
             <Step n={3}>
-              Setelah produk & barcode dibuat, tekan <strong>+ Isi Stok</strong> pada kartu produk untuk mengisi jumlah (pcs/kg/karung). Nama produk sudah terpilih otomatis.
+              Daftar produk berupa <strong>tabel</strong>. Pakai kotak cari di atas untuk mencari nama.
             </Step>
             <Step n={4}>
-              <strong>− Kurangi</strong> dipakai jika stok berkurang di luar penjualan (rusak, sampel, pecah karung).
+              Setelah produk & barcode dibuat, tekan <strong>Isi</strong> untuk mengisi jumlah (pcs/kg/karung).
             </Step>
             <Step n={5}>
-              <strong>Pindah</strong> untuk beras karungan yang dijual eceran: kurangi 1 karung, tambah 25 kg ke produk eceran. Harga tetap terpisah.
+              Setiap minggu saat SO: tekan <strong>SO</strong>, isi stok fisik hasil hitung, lalu isi <strong>alasan</strong> (wajib). Selisih dan alasan tercatat di riwayat.
             </Step>
             <Step n={6}>
+              <strong>Kurangi</strong> dipakai jika stok berkurang di luar penjualan (rusak, sampel, pecah karung).
+            </Step>
+            <Step n={7}>
+              <strong>Pindah</strong> untuk beras karungan yang dijual eceran: kurangi 1 karung, tambah 25 kg ke produk eceran. Harga tetap terpisah.
+            </Step>
+            <Step n={8}>
               Harga jual boleh diedit kapan saja (misal harga pasar naik) — tidak perlu cetak ulang QR, karena QR hanya berisi ID produk.
             </Step>
           </ol>
@@ -353,9 +359,9 @@ export default function PanduanPage() {
               </p>
             </div>
             <div>
-              <p className="font-semibold text-foreground">Telur ditimbang, harga beda-beda?</p>
+              <p className="font-semibold text-foreground">Telur sisa 0,7 kg / dibeli 1/4, 1/3, 1/2?</p>
               <p className="text-muted-foreground mt-1">
-                Tambah produk Telur ke keranjang, tekan <strong>Ubah jumlah / harga</strong>, isi total sesuai timbangan. Jumlah biasanya 1.
+                Stok telur boleh pecahan. Di POS tekan 1/4, 1/3, 1/2, atau <strong>Sisa 0,7 kg</strong>. Bisa juga ketik berat atau total hasil timbangan — stok berkurang sesuai kg.
               </p>
             </div>
             <div>

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/session";
+import { formatQty } from "@/lib/qty";
 
 export async function GET() {
   const session = await getSession();
@@ -26,7 +27,7 @@ export async function GET() {
         total: p.total,
         sudahDibayar,
         keterangan: p.keterangan,
-        item: p.penjualan.map((j) => `${j.produk.nama} × ${j.qty}`).join(", "),
+        item: p.penjualan.map((j) => `${j.produk.nama} × ${formatQty(j.qty)}`).join(", "),
       };
     })
     .filter((p) => p.sudahDibayar < p.total);

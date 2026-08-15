@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/session";
 import { writeAudit } from "@/lib/audit";
+import { hasEnoughStock, isProdukTimbang, isValidQty, lineTotal, toQty } from "@/lib/qty";
 
 export async function GET(request: NextRequest) {
   const session = await getSession();
@@ -35,7 +36,7 @@ export async function GET(request: NextRequest) {
     tanggal: p.tanggal,
     produkId: p.produkId,
     produkNama: p.produk.nama,
-    qty: p.qty,
+    qty: toQty(p.qty),
     hargaJual: p.hargaJual,
     total: p.total,
     metodeBayar: p.metodeBayar,
@@ -55,12 +56,26 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
   }
 
-  const { tanggal, produkId, qty, hargaJual, total, metodeBayar, hargaDisesuaikan } = await request.json();
-  if (!tanggal || !produkId || !qty || !hargaJual || !total || !metodeBayar) {
+  const { tanggal, produkId, qty: rawQty, hargaJual, total, metodeBayar, hargaDisesuaikan } = await request.json();
+  if (!tanggal || !produkId || !rawQty || !hargaJual || !total || !metodeBayar) {
     return NextResponse.json({ error: "Semua field wajib diisi" }, { status: 400 });
   }
-  if (!Number.isInteger(qty) || qty <= 0 || !Number.isInteger(hargaJual) || hargaJual <= 0 || total !== qty * hargaJual) {
+  const produkCek = await prisma.produk.findUnique({ where: { id: produkId } });
+  const qty = toQty(rawQty);
+  const allowFraction = Boolean(produkCek && isProdukTimbang(produkCek.nama));
+  if (
+    !produkCek ||
+    !isValidQty(qty, { allowFraction }) ||
+    !Number.isInteger(hargaJual) ||
+    hargaJual <= 0 ||
+    !Number.isInteger(total) ||
+    total <= 0 ||
+    (!hargaDisesuaikan && total !== lineTotal(qty, hargaJual))
+  ) {
     return NextResponse.json({ error: "Perhitungan penjualan tidak valid" }, { status: 400 });
+  }
+  if (!hasEnoughStock(produkCek.stok, qty)) {
+    return NextResponse.json({ error: `Stok ${produkCek.nama} tidak cukup` }, { status: 400 });
   }
 
   const penjualan = await prisma.penjualan.create({

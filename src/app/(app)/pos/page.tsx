@@ -3,6 +3,17 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { Html5Qrcode } from "html5-qrcode";
 import { digitsOnly, formatRibuan, formatRupiah } from "@/lib/money";
+import {
+  TELUR_PRESETS,
+  formatQty,
+  hasEnoughStock,
+  isProdukTimbang,
+  lineTotal,
+  parseQtyInput,
+  qtyFromTimbang,
+  sanitizeQtyInput,
+  toQty,
+} from "@/lib/qty";
 
 interface Produk {
   id: string;
@@ -73,12 +84,29 @@ export default function PosPage() {
   }, []);
 
   const addToCart = useCallback((product: Produk) => {
+    const stok = toQty(product.stok);
+    if (stok <= 0) {
+      setPayError(`Stok ${product.nama} habis`);
+      return;
+    }
+    const step = isProdukTimbang(product.nama) ? Math.min(1, stok) : 1;
+    if (!isProdukTimbang(product.nama) && !hasEnoughStock(stok, 1)) {
+      setPayError(`Stok ${product.nama} hanya ${formatQty(stok)} ${product.satuan}`);
+      return;
+    }
+    setPayError("");
     setCart((prev) => {
       const existing = prev.find((item) => item.produkId === product.id && !item.hargaDisesuaikan);
-      if (existing)
+      if (existing) {
+        const nextQty = toQty(existing.qty + step);
+        if (!hasEnoughStock(stok, nextQty)) {
+          setPayError(`Stok ${product.nama} hanya ${formatQty(stok)} ${product.satuan}`);
+          return prev;
+        }
         return prev.map((item) =>
-          item.produkId === product.id && !item.hargaDisesuaikan ? { ...item, qty: item.qty + 1 } : item
+          item.produkId === product.id && !item.hargaDisesuaikan ? { ...item, qty: nextQty } : item
         );
+      }
       return [
         ...prev,
         {
@@ -87,7 +115,7 @@ export default function PosPage() {
           nama: product.nama,
           satuan: product.satuan,
           hargaJual: product.hargaJual,
-          qty: 1,
+          qty: step,
           hargaDisesuaikan: false,
         },
       ];
@@ -168,12 +196,39 @@ export default function PosPage() {
     };
   }, [onScanDecoded, showScanner, stopScanner]);
 
+  const setLineQty = (lineId: string, nextQty: number, opts?: { hargaJual?: number; hargaDisesuaikan?: boolean }) => {
+    setCart((prev) => {
+      const line = prev.find((item) => item.lineId === lineId);
+      if (!line) return prev;
+      const product = produk.find((p) => p.id === line.produkId);
+      const stok = product ? toQty(product.stok) : Number.POSITIVE_INFINITY;
+      let qty = toQty(nextQty);
+      if (qty <= 0) return prev.filter((item) => item.lineId !== lineId);
+      if (product && !hasEnoughStock(stok, qty)) {
+        setPayError(`Stok ${product.nama} hanya ${formatQty(stok)} ${product.satuan}`);
+        qty = stok;
+        if (qty <= 0) return prev.filter((item) => item.lineId !== lineId);
+      } else {
+        setPayError("");
+      }
+      return prev.map((item) =>
+        item.lineId === lineId
+          ? {
+              ...item,
+              qty,
+              hargaJual: opts?.hargaJual ?? item.hargaJual,
+              hargaDisesuaikan: opts?.hargaDisesuaikan ?? item.hargaDisesuaikan,
+            }
+          : item
+      );
+    });
+  };
+
   const changeQty = (lineId: string, delta: number) => {
-    setCart((prev) =>
-      prev
-        .map((item) => (item.lineId === lineId ? { ...item, qty: item.qty + delta } : item))
-        .filter((item) => item.qty > 0)
-    );
+    const line = cart.find((item) => item.lineId === lineId);
+    if (!line) return;
+    const step = isProdukTimbang(line.nama) ? (delta > 0 ? 0.25 : -0.25) : delta;
+    setLineQty(lineId, toQty(line.qty + step));
   };
 
   const removeItem = (lineId: string) =>
@@ -181,29 +236,28 @@ export default function PosPage() {
 
   const openEdit = (item: CartItem) => {
     setEditId(item.lineId);
-    setEditQty(String(item.qty));
+    setEditQty(isProdukTimbang(item.nama) ? formatQty(item.qty) : String(item.qty));
     setEditHarga(String(item.hargaJual));
-    setEditTotal(String(item.hargaJual * item.qty));
+    setEditTotal(String(lineTotal(item.qty, item.hargaJual)));
   };
 
   const applyEdit = () => {
     if (!editId) return;
-    const qty = Number(digitsOnly(editQty)) || 0;
-    const harga = Number(digitsOnly(editHarga)) || 0;
-    if (qty <= 0 || harga <= 0) return;
     const line = cart.find((item) => item.lineId === editId);
-    const original = line ? produk.find((p) => p.id === line.produkId) : undefined;
-    setCart((prev) =>
-      prev.map((item) =>
-        item.lineId === editId
-          ? { ...item, qty, hargaJual: harga, hargaDisesuaikan: !original || original.hargaJual !== harga }
-          : item
-      )
-    );
+    if (!line) return;
+    const timbang = isProdukTimbang(line.nama);
+    const qty = timbang ? parseQtyInput(editQty) : Number(digitsOnly(editQty));
+    const harga = Number(digitsOnly(editHarga)) || 0;
+    if (!Number.isFinite(qty) || qty <= 0 || harga <= 0) return;
+    const original = produk.find((p) => p.id === line.produkId);
+    setLineQty(editId, qty, {
+      hargaJual: harga,
+      hargaDisesuaikan: !original || original.hargaJual !== harga,
+    });
     setEditId(null);
   };
 
-  const total = cart.reduce((sum, item) => sum + item.hargaJual * item.qty, 0);
+  const total = cart.reduce((sum, item) => sum + lineTotal(item.qty, item.hargaJual), 0);
   const diterima = Number(uangDiterima) || 0;
   const kembalian = uangDiterima ? diterima - total : 0;
   const canBayar =
@@ -228,9 +282,9 @@ export default function PosPage() {
           namaPelanggan: metodeBayar === "HUTANG" ? namaPelanggan.trim() : undefined,
           items: cart.map((item) => ({
             produkId: item.produkId,
-            qty: item.qty,
+            qty: toQty(item.qty),
             hargaJual: item.hargaJual,
-            total: item.hargaJual * item.qty,
+            total: lineTotal(item.qty, item.hargaJual),
             hargaDisesuaikan: item.hargaDisesuaikan,
           })),
         }),
@@ -250,6 +304,12 @@ export default function PosPage() {
           : "Pembayaran berhasil!"
       );
       setTimeout(() => setSuccessMsg(""), 2800);
+      fetch("/api/produk")
+        .then((r) => r.json())
+        .then((data) => {
+          if (Array.isArray(data)) setProduk(data);
+        })
+        .catch(() => {});
     } finally {
       setPaying(false);
     }
@@ -344,7 +404,7 @@ export default function PosPage() {
                       >
                         <span className="font-medium block">{p.nama}</span>
                         <span className="text-muted-foreground text-sm font-mono">
-                          {formatRupiah(p.hargaJual)} · stok {p.stok} {p.satuan}
+                          {formatRupiah(p.hargaJual)} · stok {formatQty(p.stok)} {p.satuan}
                         </span>
                       </button>
                     ))
@@ -378,7 +438,11 @@ export default function PosPage() {
             </div>
           ) : (
             <div className="space-y-2">
-              {cart.map((item) => (
+              {cart.map((item) => {
+                const timbang = isProdukTimbang(item.nama);
+                const product = produk.find((p) => p.id === item.produkId);
+                const sisaStok = product ? toQty(product.stok) : 0;
+                return (
                 <div key={item.lineId} className="rounded-xl border border-border p-3 bg-background/50 space-y-2">
                   <div className="flex items-center gap-2 sm:gap-3">
                     <div className="flex-1 min-w-0">
@@ -399,7 +463,7 @@ export default function PosPage() {
                       >
                         −
                       </button>
-                      <span className="w-7 text-center font-bold tabular-nums">{item.qty}</span>
+                      <span className="min-w-[2.5rem] text-center font-bold tabular-nums">{formatQty(item.qty)}</span>
                       <button
                         onClick={() => changeQty(item.lineId, 1)}
                         className="w-10 h-10 rounded-full bg-primary text-white font-bold text-lg flex items-center justify-center active:scale-95 transition-transform"
@@ -410,7 +474,7 @@ export default function PosPage() {
                     </div>
                     <div className="text-right min-w-[72px] sm:min-w-[88px] shrink-0">
                       <p className="font-semibold font-mono text-sm sm:text-base">
-                        {formatRupiah(item.hargaJual * item.qty)}
+                        {formatRupiah(lineTotal(item.qty, item.hargaJual))}
                       </p>
                     </div>
                     <button
@@ -421,32 +485,67 @@ export default function PosPage() {
                       ×
                     </button>
                   </div>
+                  {timbang && (
+                    <div className="flex flex-wrap gap-1.5">
+                      {TELUR_PRESETS.map((preset) => (
+                        <button
+                          key={preset.label}
+                          type="button"
+                          onClick={() => setLineQty(item.lineId, preset.qty)}
+                          className={`px-2.5 py-1.5 rounded-lg text-xs font-semibold border transition-colors ${
+                            toQty(item.qty) === preset.qty
+                              ? "bg-primary text-white border-primary"
+                              : "bg-muted/70 border-border text-foreground"
+                          }`}
+                        >
+                          {preset.label} {item.satuan}
+                        </button>
+                      ))}
+                      {sisaStok > 0 && sisaStok !== 1 && !TELUR_PRESETS.some((p) => p.qty === sisaStok) && (
+                        <button
+                          type="button"
+                          onClick={() => setLineQty(item.lineId, sisaStok)}
+                          className={`px-2.5 py-1.5 rounded-lg text-xs font-semibold border transition-colors ${
+                            toQty(item.qty) === sisaStok
+                              ? "bg-primary text-white border-primary"
+                              : "bg-amber-50 border-amber-200 text-amber-900"
+                          }`}
+                        >
+                          Sisa {formatQty(sisaStok)} {item.satuan}
+                        </button>
+                      )}
+                    </div>
+                  )}
                   <button
                     type="button"
                     onClick={() => (editId === item.lineId ? setEditId(null) : openEdit(item))}
                     className="text-xs font-semibold text-primary hover:underline"
                   >
-                    {editId === item.lineId ? "Tutup ubah harga" : "Ubah jumlah / harga (telur timbangan)"}
+                    {editId === item.lineId ? "Tutup ubah jumlah / harga" : timbang ? "Ketik berat / harga timbangan" : "Ubah jumlah / harga"}
                   </button>
                   {editId === item.lineId && (
                     <div className="rounded-xl bg-muted/70 p-3 space-y-2">
                       <p className="text-[11px] text-muted-foreground">
-                        Untuk telur ditimbang: isi jumlah 1, lalu ketik total harga hasil timbang.
+                        {timbang
+                          ? "Isi berat (0,7 / 1/4 / 1/3 / 1/2) atau ketik total hasil timbangan — stok potong sesuai kg."
+                          : "Ubah jumlah atau harga satuan jika perlu."}
                       </p>
                       <div className="grid grid-cols-3 gap-2">
                         <div>
                           <label className="text-[11px] font-medium">Jumlah{item.satuan ? ` (${item.satuan})` : ""}</label>
                           <input
                             type="text"
-                            inputMode="numeric"
+                            inputMode={timbang ? "decimal" : "numeric"}
                             value={editQty}
                             onChange={(e) => {
-                              const q = digitsOnly(e.target.value);
-                              setEditQty(q);
+                              const qRaw = timbang ? sanitizeQtyInput(e.target.value) : digitsOnly(e.target.value);
+                              setEditQty(qRaw);
+                              const q = timbang ? parseQtyInput(qRaw) : Number(digitsOnly(qRaw));
                               const h = Number(digitsOnly(editHarga)) || 0;
-                              setEditTotal(q && h ? String(Number(q) * h) : "");
+                              setEditTotal(Number.isFinite(q) && q > 0 && h ? String(lineTotal(q, h)) : "");
                             }}
                             className="input-field py-2 text-sm font-mono"
+                            placeholder={timbang ? "0,7 atau 1/4" : "1"}
                           />
                         </div>
                         <div>
@@ -458,8 +557,8 @@ export default function PosPage() {
                             onChange={(e) => {
                               const h = digitsOnly(e.target.value);
                               setEditHarga(h);
-                              const q = Number(digitsOnly(editQty)) || 0;
-                              setEditTotal(q && h ? String(q * Number(h)) : "");
+                              const q = timbang ? parseQtyInput(editQty) : Number(digitsOnly(editQty));
+                              setEditTotal(Number.isFinite(q) && q > 0 && h ? String(lineTotal(q, Number(h))) : "");
                             }}
                             className="input-field py-2 text-sm font-mono"
                           />
@@ -473,21 +572,32 @@ export default function PosPage() {
                             onChange={(e) => {
                               const t = digitsOnly(e.target.value);
                               setEditTotal(t);
-                              const q = Number(digitsOnly(editQty)) || 1;
-                              setEditQty(String(q));
-                              setEditHarga(t ? String(Math.round(Number(t) / q)) : "");
+                              const original = produk.find((p) => p.id === item.produkId);
+                              const hargaAcuan = original?.hargaJual || Number(digitsOnly(editHarga)) || 0;
+                              if (timbang && t && hargaAcuan) {
+                                const q = qtyFromTimbang(Number(t), hargaAcuan);
+                                if (Number.isFinite(q) && q > 0) {
+                                  setEditQty(formatQty(q));
+                                  setEditHarga(String(hargaAcuan));
+                                }
+                              } else {
+                                const q = timbang ? parseQtyInput(editQty) : Number(digitsOnly(editQty)) || 1;
+                                setEditQty(timbang ? formatQty(q) : String(q));
+                                setEditHarga(t && q ? String(Math.round(Number(t) / q)) : "");
+                              }
                             }}
                             className="input-field py-2 text-sm font-mono"
                           />
                         </div>
                       </div>
                       <button type="button" onClick={applyEdit} className="btn-primary w-full py-2.5 text-sm">
-                        Simpan harga
+                        Simpan jumlah / harga
                       </button>
                     </div>
                   )}
                 </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>

@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { LaporanSummary, OmsetPerUser, PenjualanEntry, PembelanjaanEntry } from "@/types";
+import { formatQty } from "@/lib/qty";
 
 type RangeKey = "today" | "week" | "month" | "custom";
 
@@ -307,7 +308,7 @@ export default function DashboardPage() {
                             {!u.isActive && <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-red-100 text-red-600">Nonaktif</span>}
                           </div>
                           <p className="text-xs text-muted-foreground mt-0.5">
-                            {u.transaksi} transaksi · {u.qty} item
+                            {u.transaksi} transaksi · {formatQty(u.qty)} item
                           </p>
                         </div>
                         <p className="font-mono font-bold text-[15px] shrink-0">{formatRupiah(u.total)}</p>
@@ -365,7 +366,7 @@ export default function DashboardPage() {
                         <div className="min-w-0 flex-1 mr-2">
                           <p className="font-medium text-[15px] truncate">{p.produkNama || p.produkId}</p>
                           <p className="text-xs text-muted-foreground mt-0.5">
-                            {p.qty} &times; {formatRupiah(p.hargaJual)} &middot; {metodeLabel(p.metodeBayar)}
+                            {formatQty(p.qty)} &times; {formatRupiah(p.hargaJual)} &middot; {metodeLabel(p.metodeBayar)}
                             {p.namaPelanggan ? ` · ${p.namaPelanggan}` : ""}
                             {p.createdByUsername ? ` · ${p.createdByUsername}` : ""}
                           </p>
@@ -393,7 +394,7 @@ export default function DashboardPage() {
                         <div className="flex flex-wrap gap-x-2 gap-y-0.5 text-xs text-muted-foreground mt-0.5">
                           <span className="text-[11px]">{p.kategori === "RESTOCK" ? "Restock" : p.kategori === "OPERASIONAL" ? "Operasional" : "Lainnya"}</span>
                           <span>
-                            {p.jumlah} &times; {formatRupiah(p.harga)}
+                            {formatQty(p.jumlah)} &times; {formatRupiah(p.harga)}
                           </span>
                         </div>
                       </div>

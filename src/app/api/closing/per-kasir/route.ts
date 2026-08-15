@@ -51,7 +51,7 @@ export async function GET(request: NextRequest) {
         hutangTotal: hutang,
         total: cash + transfer + qris,
         transaksi: userSales.length,
-        qty: userSales.reduce((s, p) => s + p.qty, 0),
+        qty: userSales.reduce((s, p) => s + Number(p.qty), 0),
       };
     })
     .sort((a, b) => b.total - a.total || a.username.localeCompare(b.username));

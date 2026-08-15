@@ -51,6 +51,10 @@ const FIELD_LABELS: Record<string, string> = {
   keterangan: "Keterangan",
   namaPelanggan: "Pelanggan",
   stok: "Stok",
+  stokSistem: "Stok sistem",
+  stokFisik: "Stok fisik",
+  selisih: "Selisih",
+  alasan: "Alasan",
   arah: "Arah",
   role: "Role",
   isActive: "Aktif",
@@ -91,6 +95,19 @@ function renderValue(key: string, val: unknown, entityType?: string): string {
       return parsed.toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" });
     }
   }
+  if (key === "arah") {
+    if (val === "adjust") return "Penyesuaian SO";
+    if (val === "tambah") return "Isi stok";
+    if (val === "kurang") return "Kurangi";
+    if (val === "pindah") return "Pindah";
+    return String(val);
+  }
+  if ((key === "qty" || key === "stok" || key === "fromQty" || key === "toQty" || key === "stokDari" || key === "stokKe" || key === "stokSistem" || key === "stokFisik" || key === "selisih") && val != null && val !== "") {
+    const n = typeof val === "number" ? val : Number(String(val).replace(",", "."));
+    if (Number.isFinite(n)) {
+      return n.toLocaleString("id-ID", { maximumFractionDigits: 3 });
+    }
+  }
   return String(val ?? "-");
 }
 
@@ -128,6 +145,17 @@ function activitySummary(log: AuditEntry): string {
     if (log.action === "CREATE") return `Tambah user ${nama}`;
     if (log.action === "DELETE") return `Hapus user ${nama}`;
     return data.isActive === false ? `Nonaktifkan ${nama}` : data.isActive === true ? `Aktifkan ${nama}` : `Ubah user ${nama}`;
+  }
+  if (log.entityType === "STOK") {
+    const nama = String(data.nama || "stok");
+    if (data.arah === "adjust") {
+      const alasan = data.alasan ? ` · ${data.alasan}` : "";
+      return `SO ${nama}: ${data.stokSistem} → ${data.stokFisik}${alasan}`;
+    }
+    if (data.arah === "pindah") return `Pindah stok ${String(data.dari || nama)} → ${String(data.ke || "")}`;
+    if (data.arah === "tambah") return `Isi stok ${nama}`;
+    if (data.arah === "kurang") return `Kurangi stok ${nama}`;
+    return `Ubah stok ${nama}`;
   }
   if (log.entityType === "UTANG") {
     const nama = String(data.namaBarang || "utang");
