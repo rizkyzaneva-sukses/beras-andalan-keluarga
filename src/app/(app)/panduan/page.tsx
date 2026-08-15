@@ -106,6 +106,7 @@ export default function PanduanPage() {
         ))}
       </div>
 
+      {/* ===== 1. MULAI CEPAT ===== */}
       <div id="panduan-mulai">
         <Card title="1. Mulai Cepat (Alur Harian)">
           <Callout type="ok">
@@ -115,7 +116,7 @@ export default function PanduanPage() {
           </Callout>
           <ol className="space-y-3 mt-2">
             <Step n={1}>
-              Siapkan produk di menu <Link href="/produk" className="text-primary font-semibold underline">Produk</Link> (nama, harga beli, harga jual, stok).
+              Siapkan produk di menu <Link href="/produk" className="text-primary font-semibold underline">Produk</Link> — pilih tipe: <strong>Karungan</strong> (karung utuh), <strong>Eceran</strong> (per kg dari karung), atau <strong>Gabungan</strong> (resep multi-produk).
             </Step>
             <Step n={2}>
               Cetak QR di menu <Link href="/barcode" className="text-primary font-semibold underline">Barcode</Link>, potong, tempel ke karung/etalase.
@@ -127,12 +128,13 @@ export default function PanduanPage() {
               Transaksi jualan lewat <Link href="/pos" className="text-primary font-semibold underline">POS Kasir</Link>.
             </Step>
             <Step n={5}>
-              Akhir hari buka <Link href="/closing" className="text-primary font-semibold underline">Closing</Link> — cek tunai vs transfer vs QRIS.
+              Akhir hari buka <Link href="/closing" className="text-primary font-semibold underline">Closing</Link> — cek tunai vs transfer vs QRIS, laba/rugi, dan omset per kasir.
             </Step>
           </ol>
         </Card>
       </div>
 
+      {/* ===== 2. LOGIN ===== */}
       <div id="panduan-login">
         <Card title="2. Login">
           <ul className="space-y-2 text-sm text-muted-foreground list-disc pl-5">
@@ -142,7 +144,7 @@ export default function PanduanPage() {
               <strong className="text-foreground">Owner</strong> diarahkan ke Dashboard (akses semua menu).
             </li>
             <li>
-              <strong className="text-foreground">Kasir</strong> diarahkan ke POS (hanya transaksi jualan).
+              <strong className="text-foreground">Kasir</strong> diarahkan ke POS (akses POS + Utang Pelanggan + Panduan).
             </li>
           </ul>
           <Callout type="info">
@@ -152,70 +154,88 @@ export default function PanduanPage() {
         </Card>
       </div>
 
+      {/* ===== 3. POS KASIR ===== */}
       <div id="panduan-pos">
         <Card title="3. POS Kasir — Jual Beras">
           <p className="text-sm text-muted-foreground">Menu utama kasir. Satu transaksi bisa banyak produk.</p>
           <ol className="space-y-3 mt-1">
             <Step n={1}>
-              <strong>Scan Barcode</strong> — tekan tombol, kamera langsung terbuka. Arahkan ke kode produk. Tidak perlu pilih gambar dari galeri. Atau tekan{" "}
+              <strong>Scan Barcode</strong> — tekan tombol, kamera langsung terbuka. Arahkan ke kode produk. Atau tekan{" "}
               <strong>+ Pilih Produk</strong> lalu cari nama.
             </Step>
             <Step n={2}>
-              Atur jumlah di keranjang pakai tombol <strong>− / +</strong>. Hapus item dengan tombol ×.
+              Atur jumlah di keranjang pakai tombol <strong>− / +</strong>. Hapus item dengan tombol ×. Untuk produk tertentu bisa <strong>sesuaikan harga manual</strong> (mis. diskon).
             </Step>
             <Step n={3}>
-              Untuk telur: pilih <strong>1/4, 1/3, 1/2, 1 kg</strong> atau ketik berat (mis. 0,7). Stok potong sesuai kg, bukan selalu 1.
+              Untuk produk <strong>timbang</strong> (telur, beras eceran): pilih <strong>1/4, 1/3, 1/2, 1 kg</strong> atau ketik berat (mis. 0,7). Stok berkurang sesuai kg.
             </Step>
             <Step n={4}>
               Pilih metode bayar: <strong>Tunai</strong>, <strong>QRIS</strong>, <strong>Transfer</strong>, atau <strong>Hutang</strong>.
             </Step>
             <Step n={5}>
-              Jika <strong>Tunai</strong>: isi uang diterima (angka otomatis pakai titik, contoh 150.000) → kembalian dihitung otomatis.
+              Jika <strong>Tunai</strong>: isi uang diterima → kembalian dihitung otomatis.
             </Step>
             <Step n={6}>
-              Jika <strong>Hutang</strong>: isi nama pelanggan, tekan <strong>Catat Hutang</strong>. Nanti bayar di menu Utang.
+              Jika <strong>Hutang</strong>: ketik nama pelanggan (muncul otomatis jika pelanggan pernah utang), tekan <strong>Catat Hutang</strong>. Nanti bayar di menu Utang.
             </Step>
             <Step n={7}>
               Tekan <strong>BAYAR</strong>. Transaksi tersimpan & stok berkurang otomatis.
             </Step>
           </ol>
           <Callout type="warn">
-            Pastikan stok produk cukup. Kalau stok 0, isi stok di menu Produk (tombol + Isi Stok) atau Pengeluaran → Restock.
+            Pastikan stok produk cukup. Kalau stok 0, buka karung di Produk (tombol <strong>Buka 1</strong>), isi stok manual, atau lewat Pengeluaran → Restock.
           </Callout>
         </Card>
       </div>
 
+      {/* ===== 4. PRODUK & STOK ===== */}
       <div id="panduan-produk">
         <Card title="4. Master Produk & Stok (Owner)">
-          <ol className="space-y-3">
-            <Step n={1}>
-              Buka <Link href="/produk" className="text-primary font-semibold underline">Produk</Link>. Satu produk: + Tambah. Banyak sekaligus: <strong>Upload banyak</strong>.
-            </Step>
-            <Step n={2}>
-              Upload kolom: <strong>PRODUK · SATUAN · JUMLAH · HPP · HARGA JUAL</strong>. Tempel dari Excel atau unggah CSV. Jumlah jadi stok awal.
-            </Step>
-            <Step n={3}>
-              Daftar produk berupa <strong>tabel</strong>. Pakai kotak cari di atas untuk mencari nama.
-            </Step>
-            <Step n={4}>
-              Setelah produk dibuat, tekan <strong>Isi</strong> hanya jika stok <em>bertambah</em> (restock).
-            </Step>
-            <Step n={5}>
-              <strong>Stock Opname</strong>: isi stok fisik. Angka itu <strong>mengganti</strong> stok, bukan ditambah. Contoh: stok 1, fisik 2 → stok jadi 2. Alasan wajib. Bisa tempel tabel PRODUK + JUMLAH.
-            </Step>
-            <Step n={6}>
-              <strong>Kurangi</strong> dipakai jika stok berkurang di luar penjualan (rusak, sampel, pecah karung).
-            </Step>
-            <Step n={7}>
-              <strong>Pindah</strong> untuk beras karungan yang dijual eceran: kurangi 1 karung, tambah 25 kg ke produk eceran. Harga tetap terpisah.
-            </Step>
-            <Step n={8}>
-              Harga jual boleh diedit kapan saja (misal harga pasar naik) — tidak perlu cetak ulang QR, karena QR hanya berisi ID produk.
-            </Step>
-          </ol>
+          <p className="text-sm text-muted-foreground">
+            Ada 3 tipe produk: <strong className="text-blue-600">Karungan</strong>,{" "}
+            <strong className="text-green-600">Eceran</strong>, dan{" "}
+            <strong className="text-purple-600">Gabungan</strong>.
+          </p>
+
+          <div className="space-y-4 mt-3">
+            <div>
+              <p className="font-semibold text-foreground text-sm mb-1.5">🔵 Karungan — Produk dalam karung/kemasan utuh</p>
+              <ul className="space-y-1.5 text-sm text-muted-foreground list-disc pl-5">
+                <li>Isi <strong>Isi per Karung</strong> (mis. 25 kg per karung).</li>
+                <li>Tombol <strong>Buka 1</strong> — buka 1 karung, stok eceran otomatis bertambah sesuai isi per karung.</li>
+                <li>Tombol <strong>Isi</strong> untuk menambah stok karung, <strong>Kurangi</strong> untuk mengurangi (rusak/sampel).</li>
+              </ul>
+            </div>
+            <div>
+              <p className="font-semibold text-foreground text-sm mb-1.5">🟢 Eceran — Produk dijual per kg/liter/pcs</p>
+              <ul className="space-y-1.5 text-sm text-muted-foreground list-disc pl-5">
+                <li>Saat tambah, pilih <strong>sumber produk karung</strong> (mis. Beras Premium Eceran ← Beras Premium Karung).</li>
+                <li>Stok eceran bertambah otomatis saat karung dibuka (Buka 1).</li>
+                <li>Stok bisa dijual langsung lewat POS.</li>
+              </ul>
+            </div>
+            <div>
+              <p className="font-semibold text-foreground text-sm mb-1.5">🟣 Gabungan — Bundling/resep multi-produk</p>
+              <ul className="space-y-1.5 text-sm text-muted-foreground list-disc pl-5">
+                <li>Buat resep dari beberapa produk sumber + jumlah per batch.</li>
+                <li>Stok gabungan = komponen terkecil ÷ jumlah yang dibutuhkan (hitung otomatis).</li>
+                <li>Cocok untuk paket bundling atau campuran khusus.</li>
+              </ul>
+            </div>
+          </div>
+
+          <div className="mt-4 space-y-3">
+            <p className="font-semibold text-foreground text-sm">Fitur Tambahan:</p>
+            <ul className="space-y-1.5 text-sm text-muted-foreground list-disc pl-5">
+              <li><strong>Upload Banyak</strong> — impor produk dari tabel Excel/CSV (kolom: PRODUK, SATUAN, JUMLAH, HPP, HARGA JUAL).</li>
+              <li><strong>Stock Opname (SO)</strong> — stok fisik <em>mengganti</em> stok sistem, bukan ditambah. Alasan wajib. Riwayat SO tersimpan.</li>
+              <li>Harga jual bisa diedit kapan saja — QR tidak perlu dicetak ulang karena hanya berisi ID produk.</li>
+            </ul>
+          </div>
         </Card>
       </div>
 
+      {/* ===== 5. CETAK BARCODE ===== */}
       <div id="panduan-barcode">
         <Card title="5. Cetak Barcode / QR (Owner)">
           <ol className="space-y-3">
@@ -232,6 +252,7 @@ export default function PanduanPage() {
         </Card>
       </div>
 
+      {/* ===== 6. PENGELUARAN ===== */}
       <div id="panduan-pengeluaran">
         <Card title="6. Pengeluaran — Restock & Biaya (Owner)">
           <ol className="space-y-3">
@@ -242,33 +263,54 @@ export default function PanduanPage() {
               Pilih kategori: <strong>Restock Barang</strong>, <strong>Operasional</strong>, atau <strong>Lainnya</strong>.
             </Step>
             <Step n={3}>
-              Restock: pilih nama produk dari daftar Master Produk (semua produk yang sudah dibuat muncul di sini). Operasional/Lainnya: ketik nama biaya.
+              <strong>Restock</strong>: pilih nama produk dari daftar Master Produk (harga beli terisi otomatis). Operasional/Lainnya: ketik nama biaya (muncul autocomplete dari history sebelumnya).
             </Step>
             <Step n={4}>
-              Status bayar: <strong>Cash</strong> = langsung potong kas. <strong>Kredit</strong> = tidak potong kas, masuk daftar Utang.
+              Status bayar: <strong>Cash</strong> = langsung potong kas. <strong>Kredit</strong> = tidak potong kas, masuk daftar Utang Toko.
             </Step>
             <Step n={5}>
-              Restock: stok produk naik (jika nama barang cocok dengan nama produk) & HPP rata-rata dihitung ulang.
+              Restock: stok produk naik otomatis & HPP rata-rata dihitung ulang.
             </Step>
           </ol>
+          <Callout type="info">
+            Filter data berdasarkan: <strong>Hari Ini</strong>, <strong>Minggu Ini</strong>, <strong>Bulan Ini</strong>, atau rentang <strong>Custom</strong>.
+          </Callout>
         </Card>
       </div>
 
+      {/* ===== 7. UTANG & HUTANG ===== */}
       <div id="panduan-utang">
         <Card title="7. Utang Toko & Hutang Pelanggan">
-          <p className="text-sm text-muted-foreground">Ada 2 jenis di menu <Link href="/utang" className="text-primary font-semibold underline">Utang & Hutang</Link>.</p>
-          <ol className="space-y-3 mt-1">
-            <Step n={1}>
-              <strong>Hutang Pelanggan</strong> — pelanggan belanja hari ini, bayar minggu depan. Catat di POS metode Hutang + nama. Saat bayar, tekan <strong>+ Terima Pembayaran</strong>.
-            </Step>
-            <Step n={2}>
-              <strong>Utang Toko</strong> — belanja ke supplier tempo. Pengeluaran status <strong>Kredit</strong> muncul di sini. Tekan <strong>+ Bayar Utang</strong> untuk cicilan.
-            </Step>
-            <Step n={3}>Bisa dicicil. Hilang dari daftar setelah lunas.</Step>
-          </ol>
+          <p className="text-sm text-muted-foreground">
+            Menu <Link href="/utang" className="text-primary font-semibold underline">Utang & Hutang</Link> — punya 2 tab dan filter status.
+          </p>
+
+          <div className="space-y-4 mt-3">
+            <div>
+              <p className="font-semibold text-foreground text-sm mb-1.5">📋 Hutang Pelanggan (Piutang)</p>
+              <ul className="space-y-1.5 text-sm text-muted-foreground list-disc pl-5">
+                <li>Pelanggan belanja sekarang, bayar nanti. Catat di POS metode <strong>Hutang</strong> + nama pelanggan.</li>
+                <li>Tekan <strong>+ Terima Bayar</strong> untuk catat pembayaran (bisa dicicil, bayar sebagian dulu).</li>
+                <li>Pelanggan yang sama bisa punya beberapa hutang sekaligus.</li>
+              </ul>
+            </div>
+            <div>
+              <p className="font-semibold text-foreground text-sm mb-1.5">📋 Utang Toko (Utang Supplier)</p>
+              <ul className="space-y-1.5 text-sm text-muted-foreground list-disc pl-5">
+                <li>Belanja ke supplier pakai tempo. Catat di Pengeluaran status <strong>Kredit</strong>.</li>
+                <li>Tekan <strong>+ Bayar Cicilan</strong> untuk cicil utang ke supplier.</li>
+                <li>Owner only — kasir tidak bisa lihat tab ini.</li>
+              </ul>
+            </div>
+          </div>
+
+          <Callout type="ok">
+            <strong>Filter Status:</strong> Semua / Belum Lunas / Lunas. Tab <strong>Belum Lunas</strong> untuk fokus yang belum selesai. Tab <strong>Lunas</strong> untuk cek history yang sudah beres. Tiap item bisa diklik untuk lihat riwayat pembayaran.
+          </Callout>
         </Card>
       </div>
 
+      {/* ===== 8. MODAL ===== */}
       <div id="panduan-modal">
         <Card title="8. Modal (Owner)">
           <p className="text-sm text-muted-foreground">
@@ -276,32 +318,38 @@ export default function PanduanPage() {
             <Link href="/modal" className="text-primary font-semibold underline">
               Modal
             </Link>
-            . Total modal dipakai hitung saldo kas di Dashboard.
+            . Total modal dipakai hitung saldo kas di Dashboard dan Closing.
           </p>
         </Card>
       </div>
 
+      {/* ===== 9. DASHBOARD ===== */}
       <div id="panduan-dashboard">
         <Card title="9. Dashboard Laba/Rugi (Owner)">
           <ul className="space-y-2 text-sm text-muted-foreground list-disc pl-5">
-            <li>Filter: Hari Ini / Minggu Ini / Bulan Ini / Custom.</li>
+            <li>Filter: <strong>Hari Ini</strong> / <strong>Minggu Ini</strong> / <strong>Bulan Ini</strong> / <strong>Custom</strong>.</li>
             <li>
-              Ringkasan: <strong className="text-foreground">Pendapatan</strong>,{" "}
+              Ringkasan kartu: <strong className="text-foreground">Pendapatan</strong>,{" "}
               <strong className="text-foreground">Pengeluaran</strong>,{" "}
               <strong className="text-foreground">Laba/Rugi</strong>,{" "}
-              <strong className="text-foreground">Saldo Kas</strong>.
+              <strong className="text-foreground">Modal</strong>,{" "}
+              <strong className="text-foreground">Piutang</strong>.
             </li>
             <li>
-              Formula cash-basis: <code className="font-mono text-xs">Pendapatan − Pengeluaran</code>.
+              Tabel <strong>per hari</strong> — lihat pendapatan, pengeluaran, dan laba rugi harian.
             </li>
-            <li>Tab detail penjualan & pengeluaran + tabel laba per hari.</li>
             <li>
-              Tombol testing: Buat Data Dummy / Reset Semua Data (hati-hati di production).
+              <strong>Omset per Kasir</strong> — rekap pendapatan per kasir dengan jumlah transaksi. Klik kasir untuk filter transaksinya saja.
+            </li>
+            <li>Tab detail penjualan & pengeluaran (paginasi).</li>
+            <li>
+              Formula cash-basis: <code className="font-mono text-xs">Saldo Kas = Modal + Pendapatan − Pengeluaran</code>.
             </li>
           </ul>
         </Card>
       </div>
 
+      {/* ===== 10. CLOSING ===== */}
       <div id="panduan-closing">
         <Card title="10. Closing Harian (Owner)">
           <p className="text-sm text-muted-foreground mb-2">
@@ -313,9 +361,11 @@ export default function PanduanPage() {
           </p>
           <ul className="space-y-1.5 text-sm text-muted-foreground list-disc pl-5">
             <li>Total pendapatan hari ini</li>
-            <li>Pecahan: Tunai / Transfer / QRIS — cocokkan dengan uang di laci & rekening</li>
+            <li>Pecahan: <strong>Tunai / Transfer / QRIS / Hutang</strong> — cocokkan dengan uang di laci & rekening</li>
+            <li>Piutang belum lunas (peringatan jika ada pelanggan belum bayar)</li>
             <li>Pengeluaran hari ini & laba/rugi</li>
-            <li>Saldo kas kumulatif</li>
+            <li><strong>Omset per Kasir</strong> — rekap jualan per kasir hari ini (total, jumlah transaksi, pecahan metode bayar per kasir)</li>
+            <li>Saldo kas kumulatif: Modal + Pendapatan Tunai − Pengeluaran Cash</li>
           </ul>
           <Callout type="ok">
             Uang tunai di laci harus ≈ total <strong>Tunai</strong> di Closing (setelah dikurangi pengeluaran cash hari itu).
@@ -323,6 +373,7 @@ export default function PanduanPage() {
         </Card>
       </div>
 
+      {/* ===== 11. KELOLA USER ===== */}
       <div id="panduan-user">
         <Card title="11. Kelola User Multi-Kasir (Owner)">
           <ol className="space-y-3">
@@ -334,11 +385,12 @@ export default function PanduanPage() {
             <Step n={4}>Akun <code className="font-mono text-xs">owner</code> utama tidak bisa dihapus.</Step>
           </ol>
           <Callout type="info">
-            Setiap jualan di POS tercatat siapa yang input. Nanti rekap closing bisa per kasir (kasir A / B / Owner).
+            Setiap jualan di POS tercatat siapa yang input. Closing bisa per kasir. Dashboard ada rekap omset per kasir.
           </Callout>
         </Card>
       </div>
 
+      {/* ===== 12. AUDIT TRAIL ===== */}
       <div id="panduan-audit">
         <Card title="12. Audit Trail (Owner)">
           <p className="text-sm text-muted-foreground">
@@ -346,14 +398,21 @@ export default function PanduanPage() {
             <Link href="/audit" className="text-primary font-semibold underline">
               Audit
             </Link>{" "}
-            mencatat edit & hapus transaksi (siapa, kapan, data sebelum/sesudah). Buka baris untuk lihat detail. Berguna deteksi kebocoran atau kesalahan input.
+            mencatat semua perubahan data: penjualan, pengeluaran, modal, produk, user, utang, piutang, dan stok. Setiap catatan menampilkan: <strong>siapa</strong>, <strong>kapan</strong>, <strong>aksi</strong> (catat/ubah/hapus), dan <strong>data sebelum/sesudah</strong>. Berguna untuk deteksi kebocoran, kesalahan input, atau jejak perubahan harga.
           </p>
         </Card>
       </div>
 
+      {/* ===== 13. TIPS & FAQ ===== */}
       <div id="panduan-tips">
         <Card title="13. Tips & FAQ">
           <div className="space-y-4 text-sm">
+            <div>
+              <p className="font-semibold text-foreground">Buka karung 1 sak = stok eceran bertambah?</p>
+              <p className="text-muted-foreground mt-1">
+                Ya! Di menu <strong>Produk</strong>, cari produk bertipe Karungan → tekan tombol <strong>Buka 1</strong>. Konfirmasi → stok eceran otomatis +25kg (atau sesuai isi per karung). Tidak perlu Pindah manual lagi.
+              </p>
+            </div>
             <div>
               <p className="font-semibold text-foreground">Kenapa barcode tidak scan / malah buka gambar?</p>
               <p className="text-muted-foreground mt-1">
@@ -361,21 +420,27 @@ export default function PanduanPage() {
               </p>
             </div>
             <div>
-              <p className="font-semibold text-foreground">Telur sisa 0,7 kg / dibeli 1/4, 1/3, 1/2?</p>
+              <p className="font-semibold text-foreground">Telur / beras eceran dijual per kg?</p>
               <p className="text-muted-foreground mt-1">
-                Stok telur boleh pecahan. Di POS tekan 1/4, 1/3, 1/2, atau <strong>Sisa 0,7 kg</strong>. Bisa juga ketik berat atau total hasil timbangan — stok berkurang sesuai kg.
+                Di POS pilih <strong>1/4, 1/3, 1/2, 1 kg</strong> atau ketik berat (mis. 0,7 kg). Stok berkurang sesuai kg. Pastikan produk bertipe Eceran dan sumbernya sudah di-set.
               </p>
             </div>
             <div>
               <p className="font-semibold text-foreground">Produk tidak muncul di restock?</p>
               <p className="text-muted-foreground mt-1">
-                Isi stok langsung di menu Produk tombol <strong>+ Isi Stok</strong>. Atau Pengeluaran → Restock, pilih nama dari daftar produk (bukan ketik bebas).
+                Pastikan produk sudah terdaftar di menu Produk. Saat Pengeluaran → Restock, pilih nama dari dropdown Master Produk (bukan ketik bebas).
               </p>
             </div>
             <div>
-              <p className="font-semibold text-foreground">Beras karung dijual eceran per kg?</p>
+              <p className="font-semibold text-foreground">Beda Karungan, Eceran, dan Gabungan?</p>
               <p className="text-muted-foreground mt-1">
-                Buat 2 produk terpisah (karung & eceran). Saat pecah karung, di produk karung tekan <strong>Pindah</strong>: kurangi 1 karung, tambah 25 kg ke eceran.
+                <strong>Karungan</strong> = stok dalam satuan karung (mis. 10 karung). <strong>Eceran</strong> = stok dalam kg/pcs, sumbernya dari karung (buka 1 karung → +25kg eceran). <strong>Gabungan</strong> = resep bundling dari beberapa produk sumber, stok dihitung dari komponen terbatas.
+              </p>
+            </div>
+            <div>
+              <p className="font-semibold text-foreground">Pelanggan bayar hutang sebagian?</p>
+              <p className="text-muted-foreground mt-1">
+                Bisa dicicil. Di menu Utang tab Pelanggan, tekan <strong>+ Terima Bayar</strong>, masukkan jumlah. Lunas otomatis saat sisa = 0. Filter <strong>Belum Lunas</strong> untuk fokus yang belum selesai. Klik item untuk lihat semua riwayat bayar.
               </p>
             </div>
             <div>
@@ -387,13 +452,13 @@ export default function PanduanPage() {
             <div>
               <p className="font-semibold text-foreground">Belanja ke supplier pakai tempo?</p>
               <p className="text-muted-foreground mt-1">
-                Pengeluaran → status <strong>Kredit</strong>. Nanti bayar cicilan di menu Utang.
+                Pengeluaran → status <strong>Kredit</strong>. Nanti bayar cicilan di menu Utang tab Toko. Filter <strong>Belum Lunas</strong> untuk lihat yang belum dibayar.
               </p>
             </div>
             <div>
               <p className="font-semibold text-foreground">HP vs desktop?</p>
               <p className="text-muted-foreground mt-1">
-                HP: menu bawah + sheet “Lainnya”. Tablet/desktop: sidebar kiri. POS di layar lebar: keranjang kiri, bayar kanan.
+                HP: menu bawah + sheet &quot;Lainnya&quot;. Tablet/desktop: sidebar kiri. POS di layar lebar: keranjang kiri, bayar kanan.
               </p>
             </div>
             <div>
