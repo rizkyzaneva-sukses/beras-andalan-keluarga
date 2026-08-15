@@ -10,5 +10,10 @@ echo "Pushing Prisma schema to database..."
 echo "Seeding database..."
 npx tsx prisma/seed.ts || echo "Seed skipped or already done"
 
-echo "Starting Next.js..."
+# Docker sets HOSTNAME to the container id. Next standalone binds to that
+# interface, so platform health checks to 127.0.0.1 fail.
+export HOSTNAME=0.0.0.0
+export PORT="${PORT:-3000}"
+
+echo "Starting Next.js on ${HOSTNAME}:${PORT}..."
 exec node server.js

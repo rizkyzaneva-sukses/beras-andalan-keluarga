@@ -10,6 +10,11 @@ export async function proxy(request: NextRequest) {
   const isLoginPage = pathname === "/login";
   const isApiRoute = pathname.startsWith("/api/");
   const isAuthRoute = pathname.startsWith("/api/auth/");
+  const isHealthRoute = pathname === "/api/health";
+
+  if (isHealthRoute) {
+    return response;
+  }
 
   if (!session.userId && !isLoginPage && !isAuthRoute) {
     if (isApiRoute) {
@@ -27,5 +32,5 @@ export async function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon.ico|manifest.json|sw.js|icons).*)"],
+  matcher: ["/((?!_next/static|_next/image|favicon.ico|manifest.json|sw.js|icons|api/health).*)"],
 };
