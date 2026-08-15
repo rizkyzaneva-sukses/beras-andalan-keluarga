@@ -189,17 +189,19 @@ export default function PanduanPage() {
         <Card title="4. Master Produk & Stok (Owner)">
           <ol className="space-y-3">
             <Step n={1}>
-              Buka <Link href="/produk" className="text-primary font-semibold underline">Produk</Link> → + Tambah.
+              Buka <Link href="/produk" className="text-primary font-semibold underline">Produk</Link>. Satu produk: + Tambah. Banyak sekaligus: <strong>Upload banyak</strong>.
             </Step>
-            <Step n={2}>Isi nama, satuan (kg/karung/liter), harga beli, harga jual.</Step>
+            <Step n={2}>
+              Upload kolom: <strong>PRODUK · SATUAN · JUMLAH · HPP · HARGA JUAL</strong>. Tempel dari Excel atau unggah CSV. Jumlah jadi stok awal.
+            </Step>
             <Step n={3}>
               Daftar produk berupa <strong>tabel</strong>. Pakai kotak cari di atas untuk mencari nama.
             </Step>
             <Step n={4}>
-              Setelah produk & barcode dibuat, tekan <strong>Isi</strong> untuk mengisi jumlah (pcs/kg/karung).
+              Setelah produk dibuat, tekan <strong>Isi</strong> hanya jika stok <em>bertambah</em> (restock).
             </Step>
             <Step n={5}>
-              Setiap minggu saat SO: tekan <strong>SO</strong>, isi stok fisik hasil hitung, lalu isi <strong>alasan</strong> (wajib). Selisih dan alasan tercatat di riwayat.
+              <strong>Stock Opname</strong>: isi stok fisik. Angka itu <strong>mengganti</strong> stok, bukan ditambah. Contoh: stok 1, fisik 2 → stok jadi 2. Alasan wajib. Bisa tempel tabel PRODUK + JUMLAH.
             </Step>
             <Step n={6}>
               <strong>Kurangi</strong> dipakai jika stok berkurang di luar penjualan (rusak, sampel, pecah karung).

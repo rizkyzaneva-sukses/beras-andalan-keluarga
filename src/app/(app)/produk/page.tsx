@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Product, StokAdjustmentEntry } from "@/types";
 import { digitsOnly, formatRibuan, formatRupiah } from "@/lib/money";
 import { formatQty, isProdukTimbang, parseQtyInput, sanitizeQtyInput, toQty } from "@/lib/qty";
+import { CONTOH_CSV, parseTabelProduk, validateBarisImport, validateBarisSo } from "@/lib/import-tabel";
 
 type StockMode = "isi" | "kurang" | "pindah" | "adjust" | null;
 
@@ -37,6 +38,17 @@ export default function ProdukPage() {
   const [stockSaving, setStockSaving] = useState(false);
   const [adjustments, setAdjustments] = useState<StokAdjustmentEntry[]>([]);
   const [historySearch, setHistorySearch] = useState("");
+  const [showImport, setShowImport] = useState(false);
+  const [importText, setImportText] = useState("");
+  const [importSaving, setImportSaving] = useState(false);
+  const [importMsg, setImportMsg] = useState("");
+  const [soMode, setSoMode] = useState(false);
+  const [soFisik, setSoFisik] = useState<Record<string, string>>({});
+  const [soAlasan, setSoAlasan] = useState("SO mingguan");
+  const [soPaste, setSoPaste] = useState("");
+  const [soSaving, setSoSaving] = useState(false);
+  const [soError, setSoError] = useState("");
+  const [soMsg, setSoMsg] = useState("");
 
   async function fetchProduk() {
     const res = await fetch("/api/produk");
@@ -60,6 +72,8 @@ export default function ProdukPage() {
     setEditId(null);
     setForm({ nama: "", satuan: "kg", hargaBeli: "", hargaJual: "" });
     setShowForm(true);
+    setShowImport(false);
+    setSoMode(false);
     setError("");
     closeStock();
   }
@@ -75,7 +89,7 @@ export default function ProdukPage() {
     setShowForm(false);
     setStockMode(mode);
     setStockId(p.id);
-    setStockJumlah(mode === "adjust" ? formatQty(p.stok) : "");
+    setStockJumlah("");
     setStockHarga(mode === "isi" ? String(p.hargaBeli) : "");
     setStockCatatan("");
     setStockStatus("CASH");
@@ -233,16 +247,159 @@ export default function ProdukPage() {
     }
   }
 
+  const importPreview = useMemo(() => parseTabelProduk(importText).map(validateBarisImport), [importText]);
+  const importOk = importPreview.filter((r) => !r.error);
+  const importBad = importPreview.filter((r) => r.error);
+
+  async function handleImport() {
+    setImportMsg("");
+    if (importOk.length === 0) {
+      setImportMsg("Tidak ada baris valid untuk diimpor");
+      return;
+    }
+    setImportSaving(true);
+    try {
+      const res = await fetch("/api/produk/import", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ items: importOk }),
+      });
+      const json = await res.json();
+      if (!res.ok) {
+        setImportMsg(json.error || "Gagal mengimpor");
+        return;
+      }
+      const skip = Array.isArray(json.skipped) && json.skipped.length ? ` · dilewati ${json.skipped.length}` : "";
+      setImportMsg(`Berhasil menambah ${json.created} produk${skip}`);
+      setImportText("");
+      fetchProduk();
+    } finally {
+      setImportSaving(false);
+    }
+  }
+
+  function applySoPaste() {
+    const rows = parseTabelProduk(soPaste).map(validateBarisSo);
+    const next = { ...soFisik };
+    let matched = 0;
+    for (const row of rows) {
+      if (row.error || !row.nama) continue;
+      const hit = active.find((p) => p.nama.trim().toLowerCase() === row.nama.toLowerCase());
+      if (!hit) continue;
+      next[hit.id] = formatQty(row.jumlah);
+      matched += 1;
+    }
+    setSoFisik(next);
+    setSoError(matched === 0 ? "Tidak ada nama produk yang cocok" : "");
+    setSoMsg(matched > 0 ? `${matched} baris terisi dari tabel` : "");
+  }
+
+  const soChanges = useMemo(() => {
+    return active
+      .map((p) => {
+        const raw = soFisik[p.id];
+        if (raw == null || raw.trim() === "") return null;
+        const fisik = parseQtyInput(raw);
+        if (!Number.isFinite(fisik)) return null;
+        const sistem = toQty(p.stok);
+        const selisih = toQty(fisik - sistem);
+        if (selisih === 0) return null;
+        return { id: p.id, nama: p.nama, satuan: p.satuan, sistem, fisik, selisih };
+      })
+      .filter((row): row is NonNullable<typeof row> => Boolean(row));
+  }, [active, soFisik]);
+
+  async function handleSoMassal() {
+    setSoError("");
+    setSoMsg("");
+    if (soAlasan.trim().length < 3) {
+      setSoError("Alasan SO wajib diisi");
+      return;
+    }
+    if (soChanges.length === 0) {
+      setSoError("Isi stok fisik yang berbeda dari stok sistem. Angka itu mengganti stok, bukan ditambah.");
+      return;
+    }
+    setSoSaving(true);
+    try {
+      const res = await fetch("/api/produk/so", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          alasan: soAlasan.trim(),
+          items: soChanges.map((row) => ({ produkId: row.id, stokFisik: row.fisik })),
+        }),
+      });
+      const json = await res.json();
+      if (!res.ok) {
+        setSoError(json.error || "Gagal menyimpan SO");
+        return;
+      }
+      setSoMsg(`SO selesai. ${json.updated} produk diganti ke stok fisik.`);
+      setSoFisik({});
+      setSoPaste("");
+      fetchProduk();
+      fetchAdjustments();
+    } finally {
+      setSoSaving(false);
+    }
+  }
+
+  function downloadContoh() {
+    const blob = new Blob([CONTOH_CSV], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "contoh-upload-produk.csv";
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  function onPickFile(file: File | undefined) {
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => setImportText(String(reader.result || ""));
+    reader.readAsText(file);
+  }
+
   return (
     <div className="page-wrap space-y-4">
-      <div className="flex justify-between items-center gap-3">
+      <div className="flex justify-between items-start gap-3">
         <div>
           <h2 className="text-xl font-bold tracking-tight">Master Produk</h2>
-          <p className="text-sm text-muted-foreground">Tabel stok, pencarian, dan penyesuaian SO mingguan.</p>
+          <p className="text-sm text-muted-foreground">Upload banyak, tabel stok, dan Stock Opname (stok diganti, bukan ditambah).</p>
         </div>
-        <button onClick={openAdd} className="btn-primary px-4 py-2.5 text-sm shrink-0">
-          + Tambah
-        </button>
+        <div className="flex flex-wrap justify-end gap-2 shrink-0">
+          <button
+            type="button"
+            onClick={() => {
+              setShowImport((v) => !v);
+              setShowForm(false);
+              setSoMode(false);
+              closeStock();
+            }}
+            className="px-3 py-2.5 rounded-lg text-sm font-semibold border border-border bg-surface"
+          >
+            Upload banyak
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setSoMode((v) => !v);
+              setShowForm(false);
+              setShowImport(false);
+              setSoError("");
+              setSoMsg("");
+              closeStock();
+            }}
+            className={`px-3 py-2.5 rounded-lg text-sm font-semibold ${soMode ? "bg-amber-600 text-white" : "bg-amber-50 text-amber-900 border border-amber-200"}`}
+          >
+            Stock Opname
+          </button>
+          <button onClick={openAdd} className="btn-primary px-4 py-2.5 text-sm">
+            + Tambah
+          </button>
+        </div>
       </div>
 
       <div className="relative">
@@ -259,6 +416,123 @@ export default function ProdukPage() {
         <p className="text-xs text-muted-foreground -mt-2">
           {search.trim() ? `${filtered.length} dari ${active.length} produk` : `${active.length} produk`}
         </p>
+      )}
+
+      {showImport && (
+        <div className="bg-white border border-border rounded-xl p-4 space-y-3.5 shadow-sm">
+          <h3 className="font-semibold text-[15px]">Upload banyak produk</h3>
+          <p className="text-xs text-muted-foreground">
+            Tempel dari Excel atau unggah CSV. Kolom: <strong>PRODUK · SATUAN · JUMLAH · HPP · HARGA JUAL</strong>. Jumlah jadi stok awal.
+          </p>
+          <div className="flex flex-wrap gap-2">
+            <label className="px-3 py-2 rounded-lg text-sm font-semibold border border-border cursor-pointer">
+              Pilih file CSV
+              <input type="file" accept=".csv,text/csv,text/plain" className="hidden" onChange={(e) => onPickFile(e.target.files?.[0])} />
+            </label>
+            <button type="button" onClick={downloadContoh} className="px-3 py-2 rounded-lg text-sm font-semibold border border-border">
+              Unduh contoh
+            </button>
+          </div>
+          <textarea
+            value={importText}
+            onChange={(e) => setImportText(e.target.value)}
+            rows={7}
+            className="w-full px-3 py-2.5 border border-border rounded-lg font-mono text-sm"
+            placeholder={"PRODUK\tSATUAN\tJUMLAH\tHPP\tHARGA JUAL\nBeras Pandan Wangi\tkg\t25\t12000\t15000"}
+          />
+          {importPreview.length > 0 && (
+            <p className="text-xs text-muted-foreground">
+              {importOk.length} baris siap · {importBad.length} error
+            </p>
+          )}
+          {importBad.length > 0 && (
+            <ul className="text-xs text-danger space-y-0.5">
+              {importBad.slice(0, 8).map((r) => (
+                <li key={`${r.baris}-${r.nama}`}>
+                  Baris {r.baris} {r.nama ? `· ${r.nama}` : ""}: {r.error}
+                </li>
+              ))}
+            </ul>
+          )}
+          {importMsg && <p className="text-sm font-medium">{importMsg}</p>}
+          <div className="flex gap-2">
+            <button type="button" onClick={handleImport} disabled={importSaving || importOk.length === 0} className="btn-primary flex-1 py-3 text-sm disabled:opacity-50">
+              {importSaving ? "Mengimpor..." : `Impor ${importOk.length} produk`}
+            </button>
+            <button type="button" onClick={() => setShowImport(false)} className="px-5 py-3 border border-border rounded-lg text-muted-foreground font-medium">
+              Tutup
+            </button>
+          </div>
+        </div>
+      )}
+
+      {soMode && (
+        <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 space-y-3.5">
+          <div>
+            <h3 className="font-semibold text-[15px] text-amber-950">Stock Opname</h3>
+            <p className="text-xs text-amber-900/80 mt-1">
+              Isi <strong>stok fisik</strong> di tabel. Stok sistem <strong>diganti</strong> jadi angka itu. Contoh: awal 1, fisik 2 → stok jadi <strong>2</strong> (bukan 3).
+            </p>
+          </div>
+          <div>
+            <label className="block text-sm font-medium mb-1">Alasan SO (wajib)</label>
+            <div className="flex flex-wrap gap-1.5 mb-2">
+              {ALASAN_SO.map((label) => (
+                <button
+                  key={label}
+                  type="button"
+                  onClick={() => setSoAlasan(label === "Lainnya" ? "" : label)}
+                  className={`px-2.5 py-1.5 rounded-lg text-xs font-semibold border ${
+                    soAlasan === label ? "bg-amber-700 text-white border-amber-700" : "border-amber-200 bg-white"
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+            <input
+              type="text"
+              value={soAlasan}
+              onChange={(e) => setSoAlasan(e.target.value)}
+              className="w-full px-3 py-2.5 border border-amber-200 rounded-lg bg-white"
+              placeholder="SO mingguan"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium mb-1">Atau tempel tabel (PRODUK · JUMLAH fisik)</label>
+            <textarea
+              value={soPaste}
+              onChange={(e) => setSoPaste(e.target.value)}
+              rows={3}
+              className="w-full px-3 py-2.5 border border-amber-200 rounded-lg font-mono text-sm bg-white"
+              placeholder={"PRODUK\tJUMLAH\nTelur\t2"}
+            />
+            <button type="button" onClick={applySoPaste} className="mt-2 px-3 py-2 rounded-lg text-xs font-semibold border border-amber-300 bg-white">
+              Isi stok fisik dari tabel
+            </button>
+          </div>
+          {soChanges.length > 0 && (
+            <p className="text-sm font-semibold text-amber-950">{soChanges.length} produk akan diganti stoknya</p>
+          )}
+          {soError && <p className="text-sm font-medium text-danger">{soError}</p>}
+          {soMsg && <p className="text-sm font-medium text-primary">{soMsg}</p>}
+          <div className="flex gap-2">
+            <button type="button" onClick={handleSoMassal} disabled={soSaving} className="flex-1 bg-amber-700 text-white py-3 rounded-lg font-semibold disabled:opacity-50">
+              {soSaving ? "Menyimpan SO..." : "Simpan Stock Opname"}
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setSoMode(false);
+                setSoFisik({});
+                setSoError("");
+              }}
+              className="px-5 py-3 border border-amber-300 rounded-lg text-amber-900 font-medium bg-white"
+            >
+              Batal
+            </button>
+          </div>
+        </div>
       )}
 
       {showForm && (
@@ -348,7 +622,7 @@ export default function ProdukPage() {
           )}
           {stockMode === "adjust" && (
             <p className="text-xs text-muted-foreground">
-              Isi stok fisik hasil hitung SO. Sistem akan menyesuaikan selisih. Alasan wajib diisi.
+              Isi <strong>stok fisik hasil hitung</strong>. Angka ini <strong>mengganti</strong> stok, bukan ditambah. Contoh: stok 1, hitung 2 → stok jadi 2.
             </p>
           )}
           <div>
@@ -356,7 +630,7 @@ export default function ProdukPage() {
               {stockMode === "pindah"
                 ? `Jumlah dikurangi (${selected.satuan})`
                 : stockMode === "adjust"
-                  ? `Stok fisik hasil hitung (${selected.satuan})`
+                  ? `Stok akan diganti menjadi (${selected.satuan})`
                   : `Jumlah (${selected.satuan})`}
             </label>
             <input
@@ -393,7 +667,7 @@ export default function ProdukPage() {
             >
               {adjustSelisih === 0
                 ? "Stok fisik sama dengan sistem — tidak perlu disesuaikan"
-                : `Selisih ${adjustSelisih > 0 ? "+" : ""}${formatQty(adjustSelisih)} ${selected.satuan} (${adjustSelisih > 0 ? "lebih dari sistem" : "kurang dari sistem"})`}
+                : `Stok ${formatQty(selected.stok)} → ${formatQty(adjustFisik)} ${selected.satuan} (diganti, selisih ${adjustSelisih > 0 ? "+" : ""}${formatQty(adjustSelisih)})`}
             </div>
           )}
           {stockMode === "isi" && (
@@ -531,8 +805,12 @@ export default function ProdukPage() {
                   <th className="px-3 py-2.5 font-semibold">Produk</th>
                   <th className="px-3 py-2.5 font-semibold">Satuan</th>
                   <th className="px-3 py-2.5 font-semibold text-right">Harga jual</th>
-                  <th className="px-3 py-2.5 font-semibold text-right">Stok</th>
-                  <th className="px-3 py-2.5 font-semibold text-right">Aksi</th>
+                  <th className="px-3 py-2.5 font-semibold text-right">Stok sistem</th>
+                  {soMode ? (
+                    <th className="px-3 py-2.5 font-semibold text-right">Stok fisik (jadi)</th>
+                  ) : (
+                    <th className="px-3 py-2.5 font-semibold text-right">Aksi</th>
+                  )}
                 </tr>
               </thead>
               <tbody>
@@ -549,6 +827,23 @@ export default function ProdukPage() {
                       <td className={`px-3 py-2.5 text-right font-mono font-bold ${stok <= 0 ? "text-danger" : stok < 10 ? "text-warning" : "text-primary"}`}>
                         {formatQty(p.stok)}
                       </td>
+                      {soMode ? (
+                      <td className="px-3 py-2.5">
+                        <input
+                          type="text"
+                          inputMode={isProdukTimbang(p.nama) ? "decimal" : "numeric"}
+                          value={soFisik[p.id] ?? ""}
+                          onChange={(e) =>
+                            setSoFisik((prev) => ({
+                              ...prev,
+                              [p.id]: isProdukTimbang(p.nama) ? sanitizeQtyInput(e.target.value) : digitsOnly(e.target.value),
+                            }))
+                          }
+                          placeholder={formatQty(p.stok)}
+                          className="w-24 ml-auto block px-2 py-1.5 border border-amber-300 rounded-md font-mono text-right bg-white"
+                        />
+                      </td>
+                      ) : (
                       <td className="px-3 py-2.5">
                         <div className="flex flex-wrap justify-end gap-1">
                           <button type="button" onClick={() => openStock("adjust", p)} className="px-2 py-1 rounded-md text-[11px] font-semibold bg-amber-50 text-amber-800">
@@ -571,6 +866,7 @@ export default function ProdukPage() {
                           </button>
                         </div>
                       </td>
+                      )}
                     </tr>
                   );
                 })}
