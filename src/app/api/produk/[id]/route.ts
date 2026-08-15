@@ -14,17 +14,45 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
   const oldRecord = await prisma.produk.findUnique({ where: { id } });
   if (!oldRecord) return NextResponse.json({ error: "Data tidak ditemukan" }, { status: 404 });
 
-  const { nama, satuan, hargaBeli, hargaJual } = await request.json();
+  const body = await request.json();
+  const { nama, satuan, hargaBeli, hargaJual, tipe, isiPerKarung, sumberProdukId, komposisi } = body;
 
+  // Update base product
   const produk = await prisma.produk.update({
     where: { id },
-    data: { nama, satuan, hargaBeli, hargaJual },
+    data: {
+      nama,
+      satuan,
+      hargaBeli: hargaBeli != null ? Number(hargaBeli) : undefined,
+      hargaJual: hargaJual != null ? Number(hargaJual) : undefined,
+      tipe: tipe || undefined,
+      isiPerKarung: tipe === "KARUNG" && isiPerKarung ? Number(isiPerKarung) : tipe === "ECERAN" || tipe === "GABUNGAN" ? null : undefined,
+      sumberProdukId: tipe === "ECERAN" ? sumberProdukId : tipe === "GABUNGAN" || tipe === "KARUNG" ? null : undefined,
+    },
   });
+
+  // Update komposisi if GABUNGAN
+  if (tipe === "GABUNGAN" && Array.isArray(komposisi)) {
+    // Delete old, create new
+    await prisma.komposisiProduk.deleteMany({ where: { produkId: id } });
+    if (komposisi.length > 0) {
+      await prisma.komposisiProduk.createMany({
+        data: komposisi.map((k: { sumberId: string; qtyPerBatch: number }) => ({
+          produkId: id,
+          sumberId: k.sumberId,
+          qtyPerBatch: Number(k.qtyPerBatch),
+        })),
+      });
+    }
+  } else if (tipe === "ECERAN" || tipe === "KARUNG") {
+    // Remove any komposisi if switching away from GABUNGAN
+    await prisma.komposisiProduk.deleteMany({ where: { produkId: id } });
+  }
 
   const { oldData, newData, hasChanges } = diffFields(
     oldRecord as unknown as Record<string, unknown>,
     produk as unknown as Record<string, unknown>,
-    ["nama", "satuan", "hargaBeli", "hargaJual"],
+    ["nama", "satuan", "hargaBeli", "hargaJual", "tipe", "isiPerKarung", "sumberProdukId"],
   );
   if (hasChanges) {
     await writeAudit({

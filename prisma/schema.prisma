@@ -30,6 +30,12 @@ enum StatusBayar {
   KREDIT
 }
 
+enum TipeProduk {
+  KARUNG
+  ECERAN
+  GABUNGAN
+}
+
 model User {
   id           String   @id @default(cuid())
   username     String   @unique
@@ -51,21 +57,41 @@ model User {
 }
 
 model Produk {
-  id           String   @id @default(cuid())
-  nama         String
-  satuan       String
-  hargaBeli    Int      @map("harga_beli")
-  hargaJual    Int      @map("harga_jual")
-  stok         Decimal  @default(0) @db.Decimal(12, 3)
-  hppRataRata  Int      @default(0) @map("hpp_rata_rata")
-  aktif        Boolean  @default(true)
-  createdAt    DateTime @default(now()) @map("created_at")
+  id              String       @id @default(cuid())
+  nama            String
+  satuan          String
+  hargaBeli       Int          @map("harga_beli")
+  hargaJual       Int          @map("harga_jual")
+  stok            Decimal      @default(0) @db.Decimal(12, 3)
+  hppRataRata     Int          @default(0) @map("hpp_rata_rata")
+  aktif           Boolean      @default(true)
+  tipe            TipeProduk   @default(KARUNG)
+  isiPerKarung    Decimal?     @map("isi_per_karung") @db.Decimal(12, 3)
+  sumberProdukId  String?      @map("sumber_produk_id")
+  createdAt       DateTime     @default(now()) @map("created_at")
 
-  penjualan    Penjualan[]
-  pembelanjaan Pembelanjaan[]
-  stokAdjustment StokAdjustment[]
+  sumberProduk     Produk?            @relation("EceranSumber", fields: [sumberProdukId], references: [id])
+  eceranDariProduk Produk[]           @relation("EceranSumber")
+  komposisiResep   KomposisiProduk[]  @relation("KomposisiResep")
+  komposisiSumber  KomposisiProduk[]  @relation("KomposisiSumber")
+  penjualan        Penjualan[]
+  pembelanjaan     Pembelanjaan[]
+  stokAdjustment   StokAdjustment[]
 
   @@map("produk")
+}
+
+model KomposisiProduk {
+  id          String   @id @default(cuid())
+  produkId    String   @map("produk_id")
+  sumberId    String   @map("sumber_id")
+  qtyPerBatch Decimal  @map("qty_per_batch") @db.Decimal(12, 3)
+
+  produk Produk @relation("KomposisiResep", fields: [produkId], references: [id], onDelete: Cascade)
+  sumber Produk @relation("KomposisiSumber", fields: [sumberId], references: [id])
+
+  @@unique([produkId, sumberId])
+  @@map("komposisi_produk")
 }
 
 model ModalLog {

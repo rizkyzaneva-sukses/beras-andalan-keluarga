@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Product, StokAdjustmentEntry } from "@/types";
+import { Product, StokAdjustmentEntry, TipeProduk, KomposisiItem } from "@/types";
 import { digitsOnly, formatRibuan, formatRupiah } from "@/lib/money";
 import { formatQty, isProdukTimbang, parseQtyInput, sanitizeQtyInput, toQty } from "@/lib/qty";
 import { CONTOH_CSV, parseTabelProduk, validateBarisImport, validateBarisSo } from "@/lib/import-tabel";
@@ -49,6 +49,15 @@ export default function ProdukPage() {
   const [soSaving, setSoSaving] = useState(false);
   const [soError, setSoError] = useState("");
   const [soMsg, setSoMsg] = useState("");
+  // New: tipe & komposisi
+  const [formTipe, setFormTipe] = useState<TipeProduk>("KARUNG");
+  const [formIsiPerKarung, setFormIsiPerKarung] = useState("25");
+  const [formSumberId, setFormSumberId] = useState("");
+  const [formKomposisi, setFormKomposisi] = useState<{ sumberId: string; qtyPerBatch: string }[]>([]);
+  const [bukaKarungId, setBukaKarungId] = useState<string | null>(null);
+  const [bukaKarungMsg, setBukaKarungMsg] = useState("");
+  const [bukaKarungErr, setBukaKarungErr] = useState("");
+  const [bukaKarungSaving, setBukaKarungSaving] = useState(false);
 
   async function fetchProduk() {
     const res = await fetch("/api/produk");
@@ -71,6 +80,10 @@ export default function ProdukPage() {
   function openAdd() {
     setEditId(null);
     setForm({ nama: "", satuan: "kg", hargaBeli: "", hargaJual: "" });
+    setFormTipe("KARUNG");
+    setFormIsiPerKarung("25");
+    setFormSumberId("");
+    setFormKomposisi([]);
     setShowForm(true);
     setShowImport(false);
     setSoMode(false);
@@ -80,6 +93,12 @@ export default function ProdukPage() {
   function openEdit(p: Product) {
     setEditId(p.id);
     setForm({ nama: p.nama, satuan: p.satuan, hargaBeli: String(p.hargaBeli), hargaJual: String(p.hargaJual) });
+    setFormTipe(p.tipe || "KARUNG");
+    setFormIsiPerKarung(p.isiPerKarung ? String(p.isiPerKarung) : "25");
+    setFormSumberId(p.sumberProdukId || "");
+    setFormKomposisi(
+      (p.komposisi || []).map((k) => ({ sumberId: k.sumberId, qtyPerBatch: String(k.qtyPerBatch) }))
+    );
     setShowForm(true);
     setError("");
     closeStock();
@@ -107,7 +126,15 @@ export default function ProdukPage() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError("");
-    const body = { ...form, hargaBeli: Number(digitsOnly(form.hargaBeli)), hargaJual: Number(digitsOnly(form.hargaJual)) };
+    const body = {
+      ...form,
+      hargaBeli: Number(digitsOnly(form.hargaBeli)),
+      hargaJual: Number(digitsOnly(form.hargaJual)),
+      tipe: formTipe,
+      isiPerKarung: formTipe === "KARUNG" ? Number(formIsiPerKarung) : undefined,
+      sumberProdukId: formTipe === "ECERAN" ? formSumberId : undefined,
+      komposisi: formTipe === "GABUNGAN" ? formKomposisi.filter((k) => k.sumberId).map((k) => ({ sumberId: k.sumberId, qtyPerBatch: Number(k.qtyPerBatch) })) : undefined,
+    };
     const url = editId ? `/api/produk/${editId}` : "/api/produk";
     const method = editId ? "PUT" : "POST";
     const res = await fetch(url, { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
@@ -126,9 +153,32 @@ export default function ProdukPage() {
     fetchProduk();
   }
 
+  async function handleBukaKarung(karungId: string) {
+    setBukaKarungErr("");
+    setBukaKarungMsg("");
+    setBukaKarungSaving(true);
+    try {
+      const res = await fetch("/api/produk/buka-karung", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ karungId }),
+      });
+      const json = await res.json();
+      if (!res.ok) {
+        setBukaKarungErr(json.error || "Gagal buka karung");
+        return;
+      }
+      setBukaKarungMsg(json.message);
+      fetchProduk();
+    } finally {
+      setBukaKarungSaving(false);
+    }
+  }
+
   const active = produk.filter((p) => p.aktif !== false);
   const selected = active.find((p) => p.id === stockId) || null;
   const tujuanList = active.filter((p) => p.id !== stockId);
+  const karungList = active.filter((p) => p.tipe === "KARUNG");
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -539,6 +589,26 @@ export default function ProdukPage() {
         <form onSubmit={handleSubmit} className="bg-white border border-border rounded-xl p-4 space-y-3.5 shadow-sm">
           <h3 className="font-semibold text-[15px]">{editId ? "Edit Produk" : "Tambah Produk"}</h3>
           <div>
+            <label className="block text-sm font-medium mb-1">Tipe Produk</label>
+            <div className="grid grid-cols-3 gap-1.5">
+              {([
+                { value: "KARUNG" as TipeProduk, label: "Karungan", desc: "Stok karung" },
+                { value: "ECERAN" as TipeProduk, label: "Eceran/Kg", desc: "Stok kg" },
+                { value: "GABUNGAN" as TipeProduk, label: "Gabungan", desc: "Resep karung" },
+              ]).map((t) => (
+                <button
+                  key={t.value}
+                  type="button"
+                  onClick={() => setFormTipe(t.value)}
+                  className={`py-2.5 rounded-lg text-xs font-semibold border ${formTipe === t.value ? "bg-primary text-white border-primary" : "border-border text-muted-foreground"}`}
+                >
+                  <span className="block">{t.label}</span>
+                  <span className="block text-[10px] opacity-70">{t.desc}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+          <div>
             <label className="block text-sm font-medium mb-1">Nama Produk</label>
             <input
               type="text"
@@ -546,7 +616,7 @@ export default function ProdukPage() {
               onChange={(e) => setForm({ ...form, nama: e.target.value })}
               required
               className="w-full px-3 py-2.5 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
-              placeholder="Contoh: Beras Pandan Wangi / Telur"
+              placeholder={formTipe === "KARUNG" ? "Beras Pandan Wangi" : formTipe === "ECERAN" ? "Beras Ecer Pandan" : "Syalala (campuran)"}
             />
           </div>
           <div>
@@ -557,9 +627,7 @@ export default function ProdukPage() {
               className="w-full px-3 py-2.5 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary bg-white"
             >
               {SATUAN.map((s) => (
-                <option key={s.value} value={s.value}>
-                  {s.label}
-                </option>
+                <option key={s.value} value={s.value}>{s.label}</option>
               ))}
             </select>
           </div>
@@ -587,6 +655,93 @@ export default function ProdukPage() {
               />
             </div>
           </div>
+
+          {/* KARUNG: isi per karung */}
+          {formTipe === "KARUNG" && (
+            <div>
+              <label className="block text-sm font-medium mb-1">Isi per Karung (kg)</label>
+              <input
+                type="text"
+                inputMode="numeric"
+                value={formIsiPerKarung}
+                onChange={(e) => setFormIsiPerKarung(digitsOnly(e.target.value))}
+                className="w-full px-3 py-2.5 border border-border rounded-lg font-mono focus:outline-none focus:ring-2 focus:ring-primary/30"
+                placeholder="25"
+              />
+              <p className="text-[11px] text-muted-foreground mt-1">Berapa kg beras dalam 1 karung</p>
+            </div>
+          )}
+
+          {/* ECERAN: pilih sumber karung */}
+          {formTipe === "ECERAN" && (
+            <div>
+              <label className="block text-sm font-medium mb-1">Sumber Karung</label>
+              <select
+                value={formSumberId}
+                onChange={(e) => setFormSumberId(e.target.value)}
+                required
+                className="w-full px-3 py-2.5 border border-border rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-primary/30"
+              >
+                <option value="">Pilih produk karung</option>
+                {karungList.map((k) => (
+                  <option key={k.id} value={k.id}>{k.nama} · {formatQty(k.stok)} karung</option>
+                ))}
+              </select>
+              <p className="text-[11px] text-muted-foreground mt-1">Saat stok eceran habis, buka karung manual dari sini</p>
+            </div>
+          )}
+
+          {/* GABUNGAN: resep komposisi */}
+          {formTipe === "GABUNGAN" && (
+            <div>
+              <label className="block text-sm font-medium mb-1">Resep Komposisi</label>
+              <p className="text-[11px] text-muted-foreground mb-2">Pilih karung yang jadi bahan + berapa karung per batch</p>
+              <div className="space-y-2">
+                {formKomposisi.map((k, i) => (
+                  <div key={i} className="flex gap-2 items-center">
+                    <select
+                      value={k.sumberId}
+                      onChange={(e) => {
+                        const next = [...formKomposisi];
+                        next[i] = { ...next[i], sumberId: e.target.value };
+                        setFormKomposisi(next);
+                      }}
+                      className="flex-1 px-3 py-2 border border-border rounded-lg bg-white text-sm"
+                    >
+                      <option value="">Pilih karung</option>
+                      {karungList.map((kr) => (
+                        <option key={kr.id} value={kr.id}>{kr.nama}</option>
+                      ))}
+                    </select>
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      value={k.qtyPerBatch}
+                      onChange={(e) => {
+                        const next = [...formKomposisi];
+                        next[i] = { ...next[i], qtyPerBatch: digitsOnly(e.target.value) };
+                        setFormKomposisi(next);
+                      }}
+                      className="w-20 px-2 py-2 border border-border rounded-lg font-mono text-sm text-center"
+                      placeholder="1"
+                    />
+                    <span className="text-xs text-muted-foreground whitespace-nowrap">karung</span>
+                    <button
+                      type="button"
+                      onClick={() => setFormKomposisi(formKomposisi.filter((_, j) => j !== i))}
+                      className="text-danger text-sm font-bold px-2"
+                    >×</button>
+                  </div>
+                ))}
+              </div>
+              <button
+                type="button"
+                onClick={() => setFormKomposisi([...formKomposisi, { sumberId: "", qtyPerBatch: "1" }])}
+                className="mt-2 text-primary text-sm font-medium hover:underline"
+              >+ Tambah Komponen</button>
+            </div>
+          )}
+
           {error && <p className="text-danger text-sm font-medium">{error}</p>}
           <div className="flex gap-2 pt-1">
             <button type="submit" className="flex-1 bg-primary text-white py-3 rounded-lg font-semibold hover:bg-primary-hover active:bg-primary-hover/80 transition-colors shadow-sm">
@@ -819,13 +974,39 @@ export default function ProdukPage() {
                   return (
                     <tr key={p.id} className="border-t border-border hover:bg-muted/40">
                       <td className="px-3 py-2.5">
-                        <p className="font-semibold text-[13px]">{p.nama}</p>
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <p className="font-semibold text-[13px]">{p.nama}</p>
+                          {p.tipe === "KARUNG" && (
+                            <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-blue-100 text-blue-700">Karung</span>
+                          )}
+                          {p.tipe === "ECERAN" && (
+                            <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-green-100 text-green-700">Ecer</span>
+                          )}
+                          {p.tipe === "GABUNGAN" && (
+                            <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-purple-100 text-purple-700">Gabungan</span>
+                          )}
+                        </div>
                         <p className="text-[11px] text-muted-foreground">Beli {formatRupiah(p.hargaBeli)}</p>
+                        {p.tipe === "KARUNG" && p.isiPerKarung && (
+                          <p className="text-[11px] text-blue-600">1 karung = {formatQty(p.isiPerKarung)} kg</p>
+                        )}
+                        {p.tipe === "ECERAN" && p.sumberProdukNama && (
+                          <p className="text-[11px] text-green-600">← {p.sumberProdukNama}</p>
+                        )}
+                        {p.tipe === "GABUNGAN" && p.komposisi && p.komposisi.length > 0 && (
+                          <p className="text-[11px] text-purple-600 truncate" title={p.komposisi.map((k) => `${k.sumberNama}(${k.qtyPerBatch})`).join(" + ")}>
+                            Resep: {p.komposisi.map((k) => `${k.sumberNama}(${k.qtyPerBatch})`).join(" + ")}
+                          </p>
+                        )}
                       </td>
                       <td className="px-3 py-2.5 text-muted-foreground">{p.satuan}</td>
                       <td className="px-3 py-2.5 text-right font-mono">{formatRupiah(p.hargaJual)}</td>
                       <td className={`px-3 py-2.5 text-right font-mono font-bold ${stok <= 0 ? "text-danger" : stok < 10 ? "text-warning" : "text-primary"}`}>
-                        {formatQty(p.stok)}
+                        {p.tipe === "GABUNGAN" && p.stokGabungan != null ? (
+                          <span title={`Stok gabungan: ${formatQty(p.stokGabungan)}`}>{formatQty(p.stokGabungan)}</span>
+                        ) : (
+                          formatQty(p.stok)
+                        )}
                       </td>
                       {soMode ? (
                       <td className="px-3 py-2.5">
@@ -846,6 +1027,13 @@ export default function ProdukPage() {
                       ) : (
                       <td className="px-3 py-2.5">
                         <div className="flex flex-wrap justify-end gap-1">
+                          {p.tipe === "KARUNG" && (
+                            <button
+                              type="button"
+                              onClick={() => { setBukaKarungId(p.id); setBukaKarungErr(""); setBukaKarungMsg(""); }}
+                              className="px-2 py-1 rounded-md text-[11px] font-semibold bg-blue-50 text-blue-700"
+                            >Buka 1</button>
+                          )}
                           <button type="button" onClick={() => openStock("adjust", p)} className="px-2 py-1 rounded-md text-[11px] font-semibold bg-amber-50 text-amber-800">
                             SO
                           </button>
@@ -875,6 +1063,38 @@ export default function ProdukPage() {
           </div>
         </div>
       )}
+
+      {/* Buka Karung confirmation */}
+      {bukaKarungId && (() => {
+        const karung = active.find((p) => p.id === bukaKarungId);
+        if (!karung) return null;
+        const eceranNama = karung.eceranDariProduk?.[0]?.nama || "eceran terkait";
+        return (
+          <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 space-y-3 shadow-sm">
+            <h3 className="font-semibold text-[15px] text-blue-950">Buka 1 Karung</h3>
+            <p className="text-sm text-blue-900">
+              Buka 1 <strong>{karung.nama}</strong> (stok: {formatQty(karung.stok)} karung) → tambah {karung.isiPerKarung ? formatQty(karung.isiPerKarung) : "25"} kg ke <strong>{eceranNama}</strong>?
+            </p>
+            {bukaKarungErr && <p className="text-danger text-sm font-medium">{bukaKarungErr}</p>}
+            {bukaKarungMsg && <p className="text-primary text-sm font-medium">{bukaKarungMsg}</p>}
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={async () => { await handleBukaKarung(bukaKarungId); }}
+                disabled={bukaKarungSaving}
+                className="flex-1 bg-blue-600 text-white py-3 rounded-lg font-semibold disabled:opacity-50"
+              >
+                {bukaKarungSaving ? "Membuka..." : "Ya, Buka 1 Karung"}
+              </button>
+              <button
+                type="button"
+                onClick={() => { setBukaKarungId(null); setBukaKarungMsg(""); setBukaKarungErr(""); }}
+                className="px-5 py-3 border border-blue-300 rounded-lg text-blue-900 font-medium bg-white"
+              >Batal</button>
+            </div>
+          </div>
+        );
+      })()}
 
       <div className="space-y-2.5">
         <div className="flex items-end justify-between gap-3">

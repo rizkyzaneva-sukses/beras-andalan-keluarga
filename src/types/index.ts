@@ -1,6 +1,14 @@
 export type UserRole = "OWNER" | "KASIR";
 export type MetodeBayar = "CASH" | "TRANSFER" | "QRIS" | "HUTANG";
 export type KategoriPembelanjaan = "RESTOCK" | "OPERASIONAL" | "LAINNYA";
+export type TipeProduk = "KARUNG" | "ECERAN" | "GABUNGAN";
+
+export interface KomposisiItem {
+  id: string;
+  sumberId: string;
+  sumberNama: string;
+  qtyPerBatch: number;
+}
 
 export interface Product {
   id: string;
@@ -11,6 +19,13 @@ export interface Product {
   stok: number;
   hppRataRata: number;
   aktif: boolean;
+  tipe: TipeProduk;
+  isiPerKarung?: number | null;
+  sumberProdukId?: string | null;
+  sumberProdukNama?: string | null;
+  komposisi?: KomposisiItem[];
+  stokGabungan?: number | null;
+  eceranDariProduk?: { id: string; nama: string }[];
 }
 
 export interface StokAdjustmentEntry {
