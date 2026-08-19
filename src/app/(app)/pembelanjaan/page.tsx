@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { PembelanjaanEntry, KategoriPembelanjaan, Product } from "@/types";
 import { digitsOnly, formatRibuan, formatRupiah } from "@/lib/money";
 import { formatQty, isProdukTimbang, lineTotal, parseQtyInput, sanitizeQtyInput } from "@/lib/qty";
+import { SearchSelect } from "@/components/SearchSelect";
 
 type RangeKey = "today" | "week" | "month" | "custom";
 
@@ -118,7 +119,27 @@ export default function PembelanjaanPage() {
         <form onSubmit={handleSubmit} className="bg-white border border-border rounded-xl p-4 space-y-3.5 shadow-sm">
           <h3 className="font-semibold text-[15px]">{editId ? "Edit Pengeluaran" : "Tambah Pengeluaran"}</h3>
           <div><label className="block text-sm font-medium mb-1">Tanggal</label><input type="date" value={form.tanggal} onChange={(e) => setForm({ ...form, tanggal: e.target.value })} required className="w-full px-3 py-2.5 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary" /></div>
-          <div><label className="block text-sm font-medium mb-1">Kategori</label><select value={form.kategori} onChange={(e) => setForm({ ...form, kategori: e.target.value as KategoriPembelanjaan, produkId: "", namaBarang: e.target.value === "RESTOCK" ? form.namaBarang : form.namaBarang })} className="w-full px-3 py-2.5 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary bg-white"><option value="RESTOCK">Restock Barang</option><option value="OPERASIONAL">Operasional</option><option value="LAINNYA">Lainnya</option></select></div>
+          <div>
+            <label className="block text-sm font-medium mb-1">Kategori</label>
+            <SearchSelect
+              value={form.kategori}
+              onChange={(v) =>
+                setForm({
+                  ...form,
+                  kategori: (v || "RESTOCK") as KategoriPembelanjaan,
+                  produkId: "",
+                  namaBarang: v === "RESTOCK" ? form.namaBarang : form.namaBarang,
+                })
+              }
+              allowClear={false}
+              placeholder="Pilih kategori..."
+              options={[
+                { value: "RESTOCK", label: "Restock Barang" },
+                { value: "OPERASIONAL", label: "Operasional" },
+                { value: "LAINNYA", label: "Lainnya" },
+              ]}
+            />
+          </div>
           <div><label className="block text-sm font-medium mb-1">Status Bayar</label>
             <div className="flex gap-2">
               <button type="button" onClick={() => setForm({ ...form, statusBayar: "CASH" })} className={`flex-1 py-2.5 rounded-lg text-sm font-medium border transition-colors ${form.statusBayar === "CASH" ? "bg-green-600 text-white border-green-600 shadow-sm" : "border-border text-muted-foreground hover:bg-muted active:bg-border"}`}>Cash</button>
@@ -131,22 +152,25 @@ export default function PembelanjaanPage() {
               {produkList.length === 0 ? (
                 <p className="text-sm text-danger">Belum ada produk. Tambah dulu di menu Produk, lalu isi stok di sini.</p>
               ) : (
-                <select
+                <SearchSelect
                   value={form.produkId}
                   required
-                  onChange={(e) => {
-                    const p = produkList.find((x) => x.id === e.target.value);
-                    setForm({ ...form, produkId: e.target.value, namaBarang: p?.nama || "", harga: p ? String(p.hargaBeli) : form.harga });
+                  placeholder="Cari produk..."
+                  options={produkList.map((p) => ({
+                    value: p.id,
+                    label: p.nama,
+                    description: `stok ${formatQty(p.stok)} ${p.satuan}`,
+                  }))}
+                  onChange={(id) => {
+                    const p = produkList.find((x) => x.id === id);
+                    setForm({
+                      ...form,
+                      produkId: id,
+                      namaBarang: p?.nama || "",
+                      harga: p ? String(p.hargaBeli) : form.harga,
+                    });
                   }}
-                  className="w-full px-3 py-2.5 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary bg-white"
-                >
-                  <option value="">Pilih produk...</option>
-                  {produkList.map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {p.nama} · stok {formatQty(p.stok)} {p.satuan}
-                    </option>
-                  ))}
-                </select>
+                />
               )}
               <p className="text-[11px] text-muted-foreground mt-1">Semua produk yang sudah dibuat (beserta barcode) muncul di sini.</p>
             </div>

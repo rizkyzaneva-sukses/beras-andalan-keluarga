@@ -2,10 +2,11 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Html5Qrcode } from "html5-qrcode";
-import { Product, StokAdjustmentEntry, TipeProduk, KomposisiItem } from "@/types";
+import { Product, StokAdjustmentEntry, TipeProduk } from "@/types";
 import { digitsOnly, formatRibuan, formatRupiah } from "@/lib/money";
 import { formatQty, isProdukTimbang, parseQtyInput, sanitizeQtyInput, toQty } from "@/lib/qty";
 import { CONTOH_CSV, parseTabelProduk, validateBarisImport, validateBarisSo } from "@/lib/import-tabel";
+import { SearchSelect } from "@/components/SearchSelect";
 
 type StockMode = "isi" | "kurang" | "pindah" | "adjust" | null;
 
@@ -35,8 +36,6 @@ export default function ProdukPage() {
   const [stockStatus, setStockStatus] = useState<"CASH" | "KREDIT">("CASH");
   const [pindahKe, setPindahKe] = useState("");
   const [pindahJumlahKe, setPindahJumlahKe] = useState("");
-  const [pindahSearch, setPindahSearch] = useState("");
-  const [showPindahList, setShowPindahList] = useState(false);
   const [showPindahScanner, setShowPindahScanner] = useState(false);
   const [pindahScanError, setPindahScanError] = useState("");
   const [pindahScanHint, setPindahScanHint] = useState("");
@@ -123,8 +122,6 @@ export default function ProdukPage() {
     setStockStatus("CASH");
     setPindahKe("");
     setPindahJumlahKe("");
-    setPindahSearch("");
-    setShowPindahList(false);
     setShowPindahScanner(false);
     setPindahScanError("");
     setPindahScanHint("");
@@ -150,8 +147,6 @@ export default function ProdukPage() {
   function closeStock() {
     stopPindahScanner();
     setShowPindahScanner(false);
-    setShowPindahList(false);
-    setPindahSearch("");
     setStockMode(null);
     setStockId(null);
     setStockError("");
@@ -159,8 +154,6 @@ export default function ProdukPage() {
 
   function selectPindahTujuan(p: Product) {
     setPindahKe(p.id);
-    setPindahSearch(p.nama);
-    setShowPindahList(false);
     setPindahScanHint("");
     setStockError("");
   }
@@ -224,15 +217,6 @@ export default function ProdukPage() {
     [produk, stockId]
   );
   const pindahTujuanSelected = tujuanList.find((p) => p.id === pindahKe) || null;
-  const filteredTujuan = useMemo(() => {
-    const q = pindahSearch.trim().toLowerCase();
-    const list = q
-      ? tujuanList.filter(
-          (p) => p.nama.toLowerCase().includes(q) || p.id.toLowerCase().includes(q)
-        )
-      : tujuanList;
-    return [...list].sort((a, b) => a.nama.localeCompare(b.nama, "id"));
-  }, [tujuanList, pindahSearch]);
   const karungList = active.filter((p) => p.tipe === "KARUNG");
 
   useEffect(() => {
@@ -739,15 +723,13 @@ export default function ProdukPage() {
           </div>
           <div>
             <label className="block text-sm font-medium mb-1">Satuan</label>
-            <select
+            <SearchSelect
               value={form.satuan}
-              onChange={(e) => setForm({ ...form, satuan: e.target.value })}
-              className="w-full px-3 py-2.5 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary bg-white"
-            >
-              {SATUAN.map((s) => (
-                <option key={s.value} value={s.value}>{s.label}</option>
-              ))}
-            </select>
+              onChange={(v) => setForm({ ...form, satuan: v || "kg" })}
+              options={SATUAN.map((s) => ({ value: s.value, label: s.label }))}
+              placeholder="Cari satuan..."
+              allowClear={false}
+            />
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
@@ -794,17 +776,17 @@ export default function ProdukPage() {
           {formTipe === "ECERAN" && (
             <div>
               <label className="block text-sm font-medium mb-1">Sumber Karung</label>
-              <select
+              <SearchSelect
                 value={formSumberId}
-                onChange={(e) => setFormSumberId(e.target.value)}
+                onChange={setFormSumberId}
                 required
-                className="w-full px-3 py-2.5 border border-border rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-primary/30"
-              >
-                <option value="">Pilih produk karung</option>
-                {karungList.map((k) => (
-                  <option key={k.id} value={k.id}>{k.nama} · {formatQty(k.stok)} karung</option>
-                ))}
-              </select>
+                placeholder="Cari produk karung..."
+                options={karungList.map((k) => ({
+                  value: k.id,
+                  label: k.nama,
+                  description: `stok ${formatQty(k.stok)} karung`,
+                }))}
+              />
               <p className="text-[11px] text-muted-foreground mt-1">Saat stok eceran habis, buka karung manual dari sini</p>
             </div>
           )}
@@ -817,20 +799,21 @@ export default function ProdukPage() {
               <div className="space-y-2">
                 {formKomposisi.map((k, i) => (
                   <div key={i} className="flex gap-2 items-center">
-                    <select
+                    <SearchSelect
+                      className="flex-1 min-w-0"
                       value={k.sumberId}
-                      onChange={(e) => {
+                      onChange={(v) => {
                         const next = [...formKomposisi];
-                        next[i] = { ...next[i], sumberId: e.target.value };
+                        next[i] = { ...next[i], sumberId: v };
                         setFormKomposisi(next);
                       }}
-                      className="flex-1 px-3 py-2 border border-border rounded-lg bg-white text-sm"
-                    >
-                      <option value="">Pilih karung</option>
-                      {karungList.map((kr) => (
-                        <option key={kr.id} value={kr.id}>{kr.nama}</option>
-                      ))}
-                    </select>
+                      placeholder="Cari karung..."
+                      options={karungList.map((kr) => ({
+                        value: kr.id,
+                        label: kr.nama,
+                        description: `stok ${formatQty(kr.stok)} karung`,
+                      }))}
+                    />
                     <input
                       type="text"
                       inputMode="numeric"
@@ -1015,45 +998,18 @@ export default function ProdukPage() {
             <>
               <div className="space-y-2">
                 <label className="block text-sm font-medium">Pindah ke produk</label>
-                <div className="flex gap-2">
-                  <div className="relative flex-1">
-                    <input
-                      type="text"
-                      value={pindahSearch}
-                      onChange={(e) => {
-                        setPindahSearch(e.target.value);
-                        setShowPindahList(true);
-                        if (pindahKe) setPindahKe("");
-                      }}
-                      onFocus={() => setShowPindahList(true)}
-                      className="w-full px-3 py-2.5 border border-border rounded-lg bg-white"
-                      placeholder="Cari nama produk tujuan..."
-                      autoComplete="off"
-                    />
-                    {showPindahList && (
-                      <div className="absolute z-20 mt-1.5 w-full bg-white border border-border rounded-xl overflow-hidden shadow-lg">
-                        <div className="max-h-48 overflow-y-auto">
-                          {filteredTujuan.length === 0 ? (
-                            <p className="px-4 py-3 text-sm text-muted-foreground text-center">Tidak ditemukan</p>
-                          ) : (
-                            filteredTujuan.map((p) => (
-                              <button
-                                key={p.id}
-                                type="button"
-                                onClick={() => selectPindahTujuan(p)}
-                                className="w-full text-left px-4 py-3 hover:bg-primary-soft/60 border-b border-border last:border-0 transition-colors"
-                              >
-                                <span className="font-medium block">{p.nama}</span>
-                                <span className="text-muted-foreground text-sm font-mono">
-                                  stok {formatQty(p.stok)} {p.satuan}
-                                </span>
-                              </button>
-                            ))
-                          )}
-                        </div>
-                      </div>
-                    )}
-                  </div>
+                <div className="flex gap-2 items-start">
+                  <SearchSelect
+                    className="flex-1 min-w-0"
+                    value={pindahKe}
+                    onChange={setPindahKe}
+                    placeholder="Cari produk tujuan..."
+                    options={tujuanList.map((p) => ({
+                      value: p.id,
+                      label: p.nama,
+                      description: `stok ${formatQty(p.stok)} ${p.satuan}`,
+                    }))}
+                  />
                   <button
                     type="button"
                     onClick={() => {
@@ -1061,7 +1017,6 @@ export default function ProdukPage() {
                         stopPindahScanner();
                         setShowPindahScanner(false);
                       } else {
-                        setShowPindahList(false);
                         setShowPindahScanner(true);
                       }
                     }}
