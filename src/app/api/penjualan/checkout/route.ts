@@ -34,7 +34,20 @@ export async function POST(request: NextRequest) {
   const produkIds = [...new Set((items as CheckoutItem[]).map((i) => i.produkId))];
   const produkList = await prisma.produk.findMany({
     where: { id: { in: produkIds } },
-    select: { id: true, nama: true, satuan: true, stok: true },
+    select: {
+      id: true,
+      nama: true,
+      satuan: true,
+      stok: true,
+      tipe: true,
+      komposisiResep: {
+        select: {
+          sumberId: true,
+          qtyPerBatch: true,
+          sumber: { select: { id: true, nama: true, satuan: true, stok: true } },
+        },
+      },
+    },
   });
   if (produkList.length !== produkIds.length) {
     return NextResponse.json({ error: "Ada produk yang tidak ditemukan" }, { status: 400 });
@@ -86,12 +99,44 @@ export async function POST(request: NextRequest) {
         needByProduk.set(item.produkId, toQty((needByProduk.get(item.produkId) || 0) + qty));
       }
 
+      // Aggregasi kebutuhan stok: GABUNGAN → komponen sumber; lainnya → produk sendiri
+      const deductByProduk = new Map<string, { need: number; nama: string; satuan: string }>();
+      const bumpNeed = (produkId: string, need: number, nama: string, satuan: string) => {
+        const prev = deductByProduk.get(produkId);
+        if (prev) {
+          prev.need = toQty(prev.need + need);
+        } else {
+          deductByProduk.set(produkId, { need: toQty(need), nama, satuan });
+        }
+      };
+
       for (const [produkId, need] of needByProduk) {
-        const current = await tx.produk.findUnique({ where: { id: produkId }, select: { nama: true, satuan: true, stok: true } });
-        if (!current || !hasEnoughStock(current.stok, need)) {
+        const meta = produkById.get(produkId);
+        if (!meta) throw new Error("STOK:Produk tidak ditemukan");
+
+        if (meta.tipe === "GABUNGAN") {
+          if (!meta.komposisiResep.length) {
+            throw new Error(`STOK:${meta.nama} belum punya komposisi`);
+          }
+          for (const k of meta.komposisiResep) {
+            const perBatch = toQty(k.qtyPerBatch);
+            const komponenNeed = toQty(need * perBatch);
+            bumpNeed(k.sumberId, komponenNeed, k.sumber.nama, k.sumber.satuan || "");
+          }
+        } else {
+          bumpNeed(produkId, need, meta.nama, meta.satuan || "");
+        }
+      }
+
+      for (const [produkId, info] of deductByProduk) {
+        const current = await tx.produk.findUnique({
+          where: { id: produkId },
+          select: { nama: true, satuan: true, stok: true },
+        });
+        if (!current || !hasEnoughStock(current.stok, info.need)) {
           const sisa = formatQty(current?.stok ?? 0);
-          const satuan = current?.satuan || "";
-          throw new Error(`STOK:${current?.nama || "Produk"} hanya ${sisa}${satuan ? ` ${satuan}` : ""}`);
+          const satuan = current?.satuan || info.satuan || "";
+          throw new Error(`STOK:${current?.nama || info.nama || "Produk"} hanya ${sisa}${satuan ? ` ${satuan}` : ""}`);
         }
       }
 
@@ -111,11 +156,14 @@ export async function POST(request: NextRequest) {
             createdBy: session.userId!,
           },
         });
-        await tx.produk.update({
-          where: { id: item.produkId },
-          data: { stok: { decrement: qty } },
-        });
         created.push(penjualan);
+      }
+
+      for (const [produkId, info] of deductByProduk) {
+        await tx.produk.update({
+          where: { id: produkId },
+          data: { stok: { decrement: info.need } },
+        });
       }
 
       return { penjualan: created, piutangId, total: cartTotal };

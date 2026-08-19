@@ -78,6 +78,18 @@ export function hasEnoughStock(stok: unknown, need: unknown) {
   return toQty(stok) + 1 / (QTY_FACTOR * 2) >= toQty(need);
 }
 
+/** Stok yang boleh dijual di POS: GABUNGAN pakai stokGabungan, selain itu stok DB. */
+export function availableStok(product: {
+  stok?: unknown;
+  tipe?: string | null;
+  stokGabungan?: unknown;
+}) {
+  if (product.tipe === "GABUNGAN" && product.stokGabungan != null && product.stokGabungan !== "") {
+    return toQty(product.stokGabungan);
+  }
+  return toQty(product.stok);
+}
+
 export function qtyFromTimbang(total: number, hargaPerKg: number) {
   if (!hargaPerKg || hargaPerKg <= 0 || !total || total <= 0) return NaN;
   return roundQty(total / hargaPerKg);

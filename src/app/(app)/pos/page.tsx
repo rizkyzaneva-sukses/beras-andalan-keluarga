@@ -5,6 +5,7 @@ import { Html5Qrcode } from "html5-qrcode";
 import { digitsOnly, formatRibuan, formatRupiah } from "@/lib/money";
 import {
   TELUR_PRESETS,
+  availableStok,
   formatQty,
   hasEnoughStock,
   isProdukTimbang,
@@ -21,6 +22,9 @@ interface Produk {
   hargaJual: number;
   satuan: string;
   stok: number;
+  tipe?: "KARUNG" | "ECERAN" | "GABUNGAN";
+  stokGabungan?: number | null;
+  sumberProdukNama?: string | null;
 }
 
 interface CartItem {
@@ -66,27 +70,57 @@ export default function PosPage() {
   const scannerRef = useRef<Html5Qrcode | null>(null);
   const handlingScan = useRef(false);
   const produkRef = useRef(produk);
-  produkRef.current = produk;
 
   useEffect(() => {
-    fetch("/api/produk")
-      .then((r) => r.json())
-      .then((data) => {
-        if (Array.isArray(data)) setProduk(data);
-      })
-      .catch(() => {});
+    produkRef.current = produk;
+  }, [produk]);
+
+  const loadProduk = useCallback(async () => {
+    try {
+      const r = await fetch("/api/produk");
+      const data = await r.json();
+      if (Array.isArray(data)) {
+        setProduk(data);
+        return data as Produk[];
+      }
+      return produkRef.current;
+    } catch {
+      return produkRef.current;
+    }
+  }, []);
+
+  useEffect(() => {
+    loadProduk();
     fetch("/api/piutang")
       .then((r) => r.json())
       .then((json) => {
         if (Array.isArray(json.names)) setNamaSuggest(json.names);
       })
       .catch(() => {});
-  }, []);
+  }, [loadProduk]);
+
+  useEffect(() => {
+    const onFocus = () => {
+      loadProduk();
+    };
+    window.addEventListener("focus", onFocus);
+    return () => window.removeEventListener("focus", onFocus);
+  }, [loadProduk]);
+
+  const stockEmptyMessage = (product: Produk) => {
+    if (product.tipe === "ECERAN" && product.sumberProdukNama) {
+      return `Stok eceran ${product.nama} habis — buka karung ${product.sumberProdukNama} dulu di menu Produk`;
+    }
+    if (product.tipe === "GABUNGAN") {
+      return `Stok ${product.nama} habis — komponen resep tidak cukup`;
+    }
+    return `Stok ${product.nama} habis`;
+  };
 
   const addToCart = useCallback((product: Produk) => {
-    const stok = toQty(product.stok);
+    const stok = availableStok(product);
     if (stok <= 0) {
-      setPayError(`Stok ${product.nama} habis`);
+      setPayError(stockEmptyMessage(product));
       return;
     }
     const step = isProdukTimbang(product.nama) ? Math.min(1, stok) : 1;
@@ -142,7 +176,9 @@ export default function PosPage() {
     async (decodedText: string) => {
       if (handlingScan.current) return;
       handlingScan.current = true;
-      const product = produkRef.current.find((p) => p.id === decodedText);
+      const code = decodedText.trim();
+      const list = await loadProduk();
+      const product = list.find((p) => p.id === code);
       if (product) {
         addToCart(product);
         setScanHint("");
@@ -153,7 +189,7 @@ export default function PosPage() {
       }
       handlingScan.current = false;
     },
-    [addToCart, stopScanner]
+    [addToCart, loadProduk, stopScanner]
   );
 
   useEffect(() => {
@@ -201,7 +237,7 @@ export default function PosPage() {
       const line = prev.find((item) => item.lineId === lineId);
       if (!line) return prev;
       const product = produk.find((p) => p.id === line.produkId);
-      const stok = product ? toQty(product.stok) : Number.POSITIVE_INFINITY;
+      const stok = product ? availableStok(product) : Number.POSITIVE_INFINITY;
       let qty = toQty(nextQty);
       if (qty <= 0) return prev.filter((item) => item.lineId !== lineId);
       if (product && !hasEnoughStock(stok, qty)) {
@@ -304,12 +340,7 @@ export default function PosPage() {
           : "Pembayaran berhasil!"
       );
       setTimeout(() => setSuccessMsg(""), 2800);
-      fetch("/api/produk")
-        .then((r) => r.json())
-        .then((data) => {
-          if (Array.isArray(data)) setProduk(data);
-        })
-        .catch(() => {});
+      loadProduk();
     } finally {
       setPaying(false);
     }
@@ -352,6 +383,7 @@ export default function PosPage() {
                 setShowScanner(false);
               } else {
                 setShowDropdown(false);
+                loadProduk();
                 setShowScanner(true);
               }
             }}
@@ -365,7 +397,11 @@ export default function PosPage() {
           <div className="relative flex-1">
             <button
               onClick={() => {
-                setShowDropdown((v) => !v);
+                setShowDropdown((v) => {
+                  const next = !v;
+                  if (next) loadProduk();
+                  return next;
+                });
                 setSearchQuery("");
                 if (showScanner) {
                   stopScanner();
@@ -404,7 +440,7 @@ export default function PosPage() {
                       >
                         <span className="font-medium block">{p.nama}</span>
                         <span className="text-muted-foreground text-sm font-mono">
-                          {formatRupiah(p.hargaJual)} · stok {formatQty(p.stok)} {p.satuan}
+                          {formatRupiah(p.hargaJual)} · stok {formatQty(availableStok(p))} {p.satuan}
                         </span>
                       </button>
                     ))
@@ -441,7 +477,7 @@ export default function PosPage() {
               {cart.map((item) => {
                 const timbang = isProdukTimbang(item.nama);
                 const product = produk.find((p) => p.id === item.produkId);
-                const sisaStok = product ? toQty(product.stok) : 0;
+                const sisaStok = product ? availableStok(product) : 0;
                 return (
                 <div key={item.lineId} className="rounded-xl border border-border p-3 bg-background/50 space-y-2">
                   <div className="flex items-center gap-2 sm:gap-3">
