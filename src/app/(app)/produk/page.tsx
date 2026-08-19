@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Html5Qrcode } from "html5-qrcode";
 import { Product, StokAdjustmentEntry, TipeProduk, KomposisiItem } from "@/types";
 import { digitsOnly, formatRibuan, formatRupiah } from "@/lib/money";
 import { formatQty, isProdukTimbang, parseQtyInput, sanitizeQtyInput, toQty } from "@/lib/qty";
@@ -34,6 +35,14 @@ export default function ProdukPage() {
   const [stockStatus, setStockStatus] = useState<"CASH" | "KREDIT">("CASH");
   const [pindahKe, setPindahKe] = useState("");
   const [pindahJumlahKe, setPindahJumlahKe] = useState("");
+  const [pindahSearch, setPindahSearch] = useState("");
+  const [showPindahList, setShowPindahList] = useState(false);
+  const [showPindahScanner, setShowPindahScanner] = useState(false);
+  const [pindahScanError, setPindahScanError] = useState("");
+  const [pindahScanHint, setPindahScanHint] = useState("");
+  const pindahScannerRef = useRef<Html5Qrcode | null>(null);
+  const pindahHandlingScan = useRef(false);
+  const tujuanListRef = useRef<Product[]>([]);
   const [stockError, setStockError] = useState("");
   const [stockSaving, setStockSaving] = useState(false);
   const [adjustments, setAdjustments] = useState<StokAdjustmentEntry[]>([]);
@@ -114,12 +123,45 @@ export default function ProdukPage() {
     setStockStatus("CASH");
     setPindahKe("");
     setPindahJumlahKe("");
+    setPindahSearch("");
+    setShowPindahList(false);
+    setShowPindahScanner(false);
+    setPindahScanError("");
+    setPindahScanHint("");
     setStockError("");
   }
 
+  const stopPindahScanner = useCallback(async () => {
+    const scanner = pindahScannerRef.current;
+    pindahScannerRef.current = null;
+    if (!scanner) return;
+    try {
+      if (scanner.isScanning) await scanner.stop();
+    } catch {
+      /* already stopped */
+    }
+    try {
+      scanner.clear();
+    } catch {
+      /* ignore */
+    }
+  }, []);
+
   function closeStock() {
+    stopPindahScanner();
+    setShowPindahScanner(false);
+    setShowPindahList(false);
+    setPindahSearch("");
     setStockMode(null);
     setStockId(null);
+    setStockError("");
+  }
+
+  function selectPindahTujuan(p: Product) {
+    setPindahKe(p.id);
+    setPindahSearch(p.nama);
+    setShowPindahList(false);
+    setPindahScanHint("");
     setStockError("");
   }
 
@@ -177,8 +219,84 @@ export default function ProdukPage() {
 
   const active = produk.filter((p) => p.aktif !== false);
   const selected = active.find((p) => p.id === stockId) || null;
-  const tujuanList = active.filter((p) => p.id !== stockId);
+  const tujuanList = useMemo(
+    () => produk.filter((p) => p.aktif !== false && p.id !== stockId),
+    [produk, stockId]
+  );
+  const pindahTujuanSelected = tujuanList.find((p) => p.id === pindahKe) || null;
+  const filteredTujuan = useMemo(() => {
+    const q = pindahSearch.trim().toLowerCase();
+    const list = q
+      ? tujuanList.filter(
+          (p) => p.nama.toLowerCase().includes(q) || p.id.toLowerCase().includes(q)
+        )
+      : tujuanList;
+    return [...list].sort((a, b) => a.nama.localeCompare(b.nama, "id"));
+  }, [tujuanList, pindahSearch]);
   const karungList = active.filter((p) => p.tipe === "KARUNG");
+
+  useEffect(() => {
+    tujuanListRef.current = tujuanList;
+  }, [tujuanList]);
+
+  const onPindahScanDecoded = useCallback(
+    async (decodedText: string) => {
+      if (pindahHandlingScan.current) return;
+      pindahHandlingScan.current = true;
+      const code = decodedText.trim();
+      const product = tujuanListRef.current.find((p) => p.id === code);
+      if (product) {
+        selectPindahTujuan(product);
+        setPindahScanHint("");
+        await stopPindahScanner();
+        setShowPindahScanner(false);
+      } else {
+        setPindahScanHint("Barcode tidak dikenali atau produk sama dengan sumber. Coba lagi.");
+      }
+      pindahHandlingScan.current = false;
+    },
+    [stopPindahScanner]
+  );
+
+  useEffect(() => {
+    if (!showPindahScanner) return;
+    let cancelled = false;
+    setPindahScanError("");
+    setPindahScanHint("");
+    pindahHandlingScan.current = false;
+
+    const scanner = new Html5Qrcode("pindah-barcode-reader");
+    pindahScannerRef.current = scanner;
+
+    (async () => {
+      try {
+        const cameras = await Html5Qrcode.getCameras();
+        if (cancelled) return;
+        if (!cameras.length) {
+          setPindahScanError("Kamera tidak ditemukan di perangkat ini.");
+          return;
+        }
+        const back = cameras.find((c) => /back|rear|environment|belakang/i.test(c.label));
+        await scanner.start(
+          back?.id ?? { facingMode: "environment" },
+          { fps: 12, qrbox: { width: 280, height: 160 } },
+          (text) => {
+            onPindahScanDecoded(text);
+          },
+          () => {}
+        );
+      } catch {
+        if (!cancelled) {
+          setPindahScanError("Izinkan akses kamera di browser, lalu tekan Scan lagi.");
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+      stopPindahScanner();
+    };
+  }, [onPindahScanDecoded, showPindahScanner, stopPindahScanner]);
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -895,30 +1013,101 @@ export default function ProdukPage() {
           )}
           {stockMode === "pindah" && (
             <>
-              <div>
-                <label className="block text-sm font-medium mb-1">Pindah ke produk</label>
-                <select
-                  value={pindahKe}
-                  onChange={(e) => setPindahKe(e.target.value)}
-                  className="w-full px-3 py-2.5 border border-border rounded-lg bg-white"
-                >
-                  <option value="">Pilih produk eceran / tujuan</option>
-                  {tujuanList.map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {p.nama} · stok {formatQty(p.stok)} {p.satuan}
-                    </option>
-                  ))}
-                </select>
+              <div className="space-y-2">
+                <label className="block text-sm font-medium">Pindah ke produk</label>
+                <div className="flex gap-2">
+                  <div className="relative flex-1">
+                    <input
+                      type="text"
+                      value={pindahSearch}
+                      onChange={(e) => {
+                        setPindahSearch(e.target.value);
+                        setShowPindahList(true);
+                        if (pindahKe) setPindahKe("");
+                      }}
+                      onFocus={() => setShowPindahList(true)}
+                      className="w-full px-3 py-2.5 border border-border rounded-lg bg-white"
+                      placeholder="Cari nama produk tujuan..."
+                      autoComplete="off"
+                    />
+                    {showPindahList && (
+                      <div className="absolute z-20 mt-1.5 w-full bg-white border border-border rounded-xl overflow-hidden shadow-lg">
+                        <div className="max-h-48 overflow-y-auto">
+                          {filteredTujuan.length === 0 ? (
+                            <p className="px-4 py-3 text-sm text-muted-foreground text-center">Tidak ditemukan</p>
+                          ) : (
+                            filteredTujuan.map((p) => (
+                              <button
+                                key={p.id}
+                                type="button"
+                                onClick={() => selectPindahTujuan(p)}
+                                className="w-full text-left px-4 py-3 hover:bg-primary-soft/60 border-b border-border last:border-0 transition-colors"
+                              >
+                                <span className="font-medium block">{p.nama}</span>
+                                <span className="text-muted-foreground text-sm font-mono">
+                                  stok {formatQty(p.stok)} {p.satuan}
+                                </span>
+                              </button>
+                            ))
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (showPindahScanner) {
+                        stopPindahScanner();
+                        setShowPindahScanner(false);
+                      } else {
+                        setShowPindahList(false);
+                        setShowPindahScanner(true);
+                      }
+                    }}
+                    className={`shrink-0 px-3.5 py-2.5 rounded-lg font-semibold text-sm border transition-colors ${
+                      showPindahScanner
+                        ? "bg-danger text-white border-danger"
+                        : "bg-primary text-white border-primary"
+                    }`}
+                  >
+                    {showPindahScanner ? "Tutup" : "Scan"}
+                  </button>
+                </div>
+                {pindahTujuanSelected && (
+                  <div className="rounded-lg bg-primary-soft/50 border border-primary/20 px-3 py-2 text-sm">
+                    Tujuan: <strong>{pindahTujuanSelected.nama}</strong>
+                    <span className="text-muted-foreground font-mono">
+                      {" "}
+                      · stok {formatQty(pindahTujuanSelected.stok)} {pindahTujuanSelected.satuan}
+                    </span>
+                  </div>
+                )}
+                {showPindahScanner && (
+                  <div className="border border-border rounded-xl overflow-hidden p-3 space-y-2 bg-muted/30">
+                    <p className="text-sm font-semibold text-center">Arahkan kamera ke barcode tujuan</p>
+                    <div id="pindah-barcode-reader" className="rounded-xl overflow-hidden bg-black/80 min-h-[200px]" />
+                    {pindahScanError && (
+                      <p className="text-sm text-danger font-medium text-center">{pindahScanError}</p>
+                    )}
+                    {pindahScanHint && !pindahScanError && (
+                      <p className="text-sm text-amber-700 font-medium text-center">{pindahScanHint}</p>
+                    )}
+                  </div>
+                )}
               </div>
               <div>
                 <label className="block text-sm font-medium mb-1">Jumlah ditambahkan ke tujuan</label>
                 <input
                   type="text"
-                  inputMode={tujuanList.find((p) => p.id === pindahKe) && isProdukTimbang(tujuanList.find((p) => p.id === pindahKe)!.nama) ? "decimal" : "numeric"}
+                  inputMode={pindahTujuanSelected && isProdukTimbang(pindahTujuanSelected.nama) ? "decimal" : "numeric"}
                   value={pindahJumlahKe}
                   onChange={(e) => {
-                    const tujuan = tujuanList.find((p) => p.id === pindahKe);
-                    setPindahJumlahKe(tujuan && isProdukTimbang(tujuan.nama) ? sanitizeQtyInput(e.target.value) : digitsOnly(e.target.value));
+                    setPindahJumlahKe(
+                      pindahTujuanSelected && isProdukTimbang(pindahTujuanSelected.nama)
+                        ? sanitizeQtyInput(e.target.value)
+                        : digitsOnly(e.target.value)
+                    );
                   }}
                   className="w-full px-3 py-2.5 border border-border rounded-lg font-mono"
                   placeholder="Contoh: 25 (jika 1 karung = 25 kg)"
