@@ -28,13 +28,29 @@ const NAV_ITEMS: NavItem[] = [
   { href: "/barcode", label: "Barcode", short: "QR", ownerOnly: true },
   { href: "/modal", label: "Modal", short: "Modal", ownerOnly: true },
   { href: "/audit", label: "Audit", short: "Audit", ownerOnly: true },
+  { href: "/pengaturan", label: "Pengaturan", short: "Set", ownerOnly: true },
   { href: "/panduan", label: "Panduan", short: "Bantu", ownerOnly: false },
 ];
+
+interface TokoSettings {
+  namaToko: string;
+  slogan: string;
+  logoText: string;
+  logoColor: string;
+  logoUrl: string;
+}
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
   const [user, setUser] = useState<NavUser | null>(null);
+  const [settings, setSettings] = useState<TokoSettings>({
+    namaToko: "Beras Andalan",
+    slogan: "Toko beras keluarga",
+    logoText: "B",
+    logoColor: "#15803d",
+    logoUrl: "",
+  });
   const [moreOpen, setMoreOpen] = useState(false);
 
   useEffect(() => {
@@ -44,6 +60,21 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         if (data.user) setUser(data.user);
         else router.push("/login");
       });
+
+    fetch("/api/pengaturan")
+      .then((r) => r.json())
+      .then((json) => {
+        if (json.data) {
+          setSettings({
+            namaToko: json.data.namaToko || "Beras Andalan",
+            slogan: json.data.slogan || "Toko beras keluarga",
+            logoText: json.data.logoText || "B",
+            logoColor: json.data.logoColor || "#15803d",
+            logoUrl: json.data.logoUrl || "",
+          });
+        }
+      })
+      .catch(() => {});
   }, [router]);
 
   useEffect(() => {
@@ -81,11 +112,22 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       <aside className="hidden md:flex md:w-60 lg:w-64 shrink-0 flex-col border-r border-border bg-surface sticky top-0 h-dvh">
         <div className="px-5 py-5 border-b border-border">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-primary text-white flex items-center justify-center font-bold text-lg shadow-sm">
-              B
-            </div>
+            {settings.logoUrl ? (
+              <img
+                src={settings.logoUrl}
+                alt={settings.namaToko}
+                className="w-10 h-10 rounded-xl object-cover border border-border shrink-0 shadow-sm"
+              />
+            ) : (
+              <div
+                className="w-10 h-10 rounded-xl text-white flex items-center justify-center font-bold text-lg shrink-0 shadow-sm transition-colors"
+                style={{ backgroundColor: settings.logoColor || "#15803d" }}
+              >
+                {settings.logoText || (settings.namaToko ? settings.namaToko.slice(0, 1).toUpperCase() : "B")}
+              </div>
+            )}
             <div className="min-w-0">
-              <p className="font-bold text-[15px] leading-tight truncate">Beras Andalan</p>
+              <p className="font-bold text-[15px] leading-tight truncate">{settings.namaToko}</p>
               <p className="text-xs text-muted-foreground truncate">
                 {user.username} · {user.role === "OWNER" ? "Pemilik" : "Kasir"}
               </p>
@@ -131,7 +173,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           style={{ paddingTop: "calc(0.75rem + var(--safe-top))" }}
         >
           <div className="min-w-0">
-            <h1 className="text-base font-bold leading-tight">Beras Andalan</h1>
+            <h1 className="text-base font-bold leading-tight truncate">{settings.namaToko}</h1>
             <p className="text-[11px] opacity-80 truncate">
               {user.username} · {user.role === "OWNER" ? "Pemilik" : "Kasir"}
             </p>
@@ -147,9 +189,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         <header className="hidden md:flex sticky top-0 z-20 bg-surface/90 backdrop-blur border-b border-border px-6 py-3.5 items-center justify-between">
           <div>
             <p className="text-sm font-semibold text-foreground">
-              {visible.find((i) => pathname.startsWith(i.href))?.label || "Beras Andalan"}
+              {visible.find((i) => pathname.startsWith(i.href))?.label || settings.namaToko}
             </p>
-            <p className="text-xs text-muted-foreground">Toko beras keluarga</p>
+            <p className="text-xs text-muted-foreground">{settings.slogan || "Toko beras keluarga"}</p>
           </div>
         </header>
 

@@ -1,7 +1,15 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+
+interface TokoSettings {
+  namaToko: string;
+  slogan: string;
+  logoText: string;
+  logoColor: string;
+  logoUrl: string;
+}
 
 export default function LoginPage() {
   const router = useRouter();
@@ -9,6 +17,30 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [settings, setSettings] = useState<TokoSettings>({
+    namaToko: "Beras Andalan",
+    slogan: "Toko beras keluarga",
+    logoText: "B",
+    logoColor: "#15803d",
+    logoUrl: "",
+  });
+
+  useEffect(() => {
+    fetch("/api/pengaturan")
+      .then((r) => r.json())
+      .then((json) => {
+        if (json.data) {
+          setSettings({
+            namaToko: json.data.namaToko || "Beras Andalan",
+            slogan: json.data.slogan || "Toko beras keluarga",
+            logoText: json.data.logoText || "B",
+            logoColor: json.data.logoColor || "#15803d",
+            logoUrl: json.data.logoUrl || "",
+          });
+        }
+      })
+      .catch(() => {});
+  }, []);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -38,11 +70,22 @@ export default function LoginPage() {
     <div className="min-h-dvh flex flex-col items-center justify-center bg-background p-4 sm:p-6">
       <div className="w-full max-w-[400px]">
         <div className="text-center mb-8">
-          <div className="mx-auto w-16 h-16 rounded-2xl bg-primary text-white flex items-center justify-center text-2xl font-bold shadow-sm mb-4">
-            B
-          </div>
-          <h1 className="text-2xl font-bold tracking-tight text-foreground">Beras Andalan</h1>
-          <p className="text-muted-foreground text-sm mt-1.5">Masuk untuk mulai catat transaksi</p>
+          {settings.logoUrl ? (
+            <img
+              src={settings.logoUrl}
+              alt={settings.namaToko}
+              className="mx-auto w-16 h-16 rounded-2xl object-cover border border-border shadow-sm mb-4"
+            />
+          ) : (
+            <div
+              className="mx-auto w-16 h-16 rounded-2xl text-white flex items-center justify-center text-2xl font-bold shadow-sm mb-4 transition-colors"
+              style={{ backgroundColor: settings.logoColor || "#15803d" }}
+            >
+              {settings.logoText || (settings.namaToko ? settings.namaToko.slice(0, 1).toUpperCase() : "B")}
+            </div>
+          )}
+          <h1 className="text-2xl font-bold tracking-tight text-foreground">{settings.namaToko}</h1>
+          <p className="text-muted-foreground text-sm mt-1.5">{settings.slogan || "Masuk untuk mulai catat transaksi"}</p>
         </div>
 
         <div className="card-surface p-5 sm:p-6">

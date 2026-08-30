@@ -16,6 +16,7 @@ type SectionId =
   | "closing"
   | "user"
   | "audit"
+  | "pengaturan"
   | "tips";
 
 const SECTIONS: { id: SectionId; label: string; ownerOnly?: boolean }[] = [
@@ -31,6 +32,7 @@ const SECTIONS: { id: SectionId; label: string; ownerOnly?: boolean }[] = [
   { id: "closing", label: "Closing Harian", ownerOnly: true },
   { id: "user", label: "Kelola User", ownerOnly: true },
   { id: "audit", label: "Audit Trail", ownerOnly: true },
+  { id: "pengaturan", label: "Pengaturan & Reset", ownerOnly: true },
   { id: "tips", label: "Tips & FAQ" },
 ];
 
@@ -403,9 +405,33 @@ export default function PanduanPage() {
         </Card>
       </div>
 
-      {/* ===== 13. TIPS & FAQ ===== */}
+      {/* ===== 13. PENGATURAN & RESET ===== */}
+      <div id="panduan-pengaturan">
+        <Card title="13. Pengaturan Toko & Reset (Owner)">
+          <ol className="space-y-3">
+            <Step n={1}>
+              Buka menu{" "}
+              <Link href="/pengaturan" className="text-primary font-semibold underline">
+                Pengaturan
+              </Link>{" "}
+              untuk mengganti nama toko, slogan, dan logo brand.
+            </Step>
+            <Step n={2}>
+              <strong>Logo Toko:</strong> Bisa memilih inisial teks dengan warna brand atau upload logo gambar toko sendiri (JPG/PNG).
+            </Step>
+            <Step n={3}>
+              <strong>Reset Data:</strong> Jika toko memulai pembukuan baru / periode baru dari angka 0, tersedia opsi <em>Reset Transaksi & Stok Jadi 0</em> (katalog produk tetap ada) atau <em>Reset Total Pabrik</em> dengan pengaman konfirmasi ketik RESET.
+            </Step>
+            <Step n={4}>
+              <strong>Riwayat Masalah Selesai:</strong> Tab khusus yang menjelaskan seluruh masalah nyata operasional toko beras yang telah diselesaikan oleh sistem ini.
+            </Step>
+          </ol>
+        </Card>
+      </div>
+
+      {/* ===== 14. TIPS & FAQ ===== */}
       <div id="panduan-tips">
-        <Card title="13. Tips & FAQ">
+        <Card title="14. Tips & FAQ">
           <div className="space-y-4 text-sm">
             <div>
               <p className="font-semibold text-foreground">Buka karung 1 sak = stok eceran bertambah?</p>

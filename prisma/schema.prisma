@@ -227,3 +227,18 @@ model PembayaranPiutang {
 
   @@map("pembayaran_piutang")
 }
+
+model Pengaturan {
+  id        String   @id @default("default")
+  namaToko  String   @default("Beras Andalan") @map("nama_toko")
+  slogan    String?  @default("Toko beras keluarga") @map("slogan")
+  logoText  String?  @default("B") @map("logo_text")
+  logoColor String?  @default("#15803d") @map("logo_color")
+  logoUrl   String?  @map("logo_url")
+  alamat    String?  @map("alamat")
+  telepon   String?  @map("telepon")
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
+
+  @@map("pengaturan")
+}
+
