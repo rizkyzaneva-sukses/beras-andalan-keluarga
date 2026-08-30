@@ -26,19 +26,23 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Jumlah pembayaran melebihi sisa hutang" }, { status: 400 });
   }
 
-  const bayar = await prisma.pembayaranPiutang.create({
-    data: {
-      piutangId,
-      jumlah,
-      tanggal: new Date(),
-      metodeBayar: metode,
-      createdBy: session.userId,
-    },
-  });
+  const bayar = await prisma.$transaction(async (tx) => {
+    const created = await tx.pembayaranPiutang.create({
+      data: {
+        piutangId,
+        jumlah,
+        tanggal: new Date(),
+        metodeBayar: metode,
+        createdBy: session.userId!,
+      },
+    });
 
-  await prisma.piutang.update({
-    where: { id: piutangId },
-    data: { sudahDibayar: sudahDibayar + jumlah },
+    await tx.piutang.update({
+      where: { id: piutangId },
+      data: { sudahDibayar: sudahDibayar + jumlah },
+    });
+
+    return created;
   });
 
   await writeAudit({

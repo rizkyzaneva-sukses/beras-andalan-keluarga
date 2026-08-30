@@ -58,6 +58,44 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     });
   }
 
+  // Handle stock adjustments for RESTOCK changes
+  const oldJumlah = toQty(oldRecord.jumlah);
+  const newJumlah = toQty(newRecord.jumlah);
+  if (oldRecord.kategori === "RESTOCK" && newRecord.kategori === "RESTOCK") {
+    if (oldRecord.produkId && newRecord.produkId && oldRecord.produkId === newRecord.produkId) {
+      if (oldJumlah !== newJumlah) {
+        const diff = toQty(newJumlah - oldJumlah);
+        await prisma.produk.update({
+          where: { id: newRecord.produkId },
+          data: { stok: { increment: diff } },
+        }).catch(() => {});
+      }
+    } else {
+      if (oldRecord.produkId) {
+        await prisma.produk.update({
+          where: { id: oldRecord.produkId },
+          data: { stok: { decrement: oldJumlah } },
+        }).catch(() => {});
+      }
+      if (newRecord.produkId) {
+        await prisma.produk.update({
+          where: { id: newRecord.produkId },
+          data: { stok: { increment: newJumlah } },
+        }).catch(() => {});
+      }
+    }
+  } else if (oldRecord.kategori === "RESTOCK" && newRecord.kategori !== "RESTOCK" && oldRecord.produkId) {
+    await prisma.produk.update({
+      where: { id: oldRecord.produkId },
+      data: { stok: { decrement: oldJumlah } },
+    }).catch(() => {});
+  } else if (oldRecord.kategori !== "RESTOCK" && newRecord.kategori === "RESTOCK" && newRecord.produkId) {
+    await prisma.produk.update({
+      where: { id: newRecord.produkId },
+      data: { stok: { increment: newJumlah } },
+    }).catch(() => {});
+  }
+
   return NextResponse.json(newRecord);
 }
 
