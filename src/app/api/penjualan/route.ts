@@ -78,20 +78,12 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: `Stok ${produkCek.nama} tidak cukup` }, { status: 400 });
   }
 
-  const produk = await prisma.produk.findUnique({ where: { id: produkId } });
-  if (!produk) {
-    return NextResponse.json({ error: "Produk tidak ditemukan" }, { status: 404 });
-  }
-  if (produk.stok < qty) {
-    return NextResponse.json({ error: `Stok ${produk.nama} hanya ${produk.stok}` }, { status: 400 });
-  }
-
   const penjualan = await prisma.$transaction(async (tx) => {
     const updated = await tx.produk.update({
       where: { id: produkId },
       data: { stok: { decrement: qty } },
     });
-    if (updated.stok < 0) {
+    if (toQty(updated.stok) < 0) {
       throw new Error("Stok tidak cukup");
     }
     return tx.penjualan.create({
@@ -113,7 +105,7 @@ export async function POST(request: NextRequest) {
     entityId: penjualan.id,
     action: "CREATE",
     newData: {
-      produkNama: produk.nama,
+      produkNama: produkCek.nama,
       qty,
       hargaJual,
       total,
