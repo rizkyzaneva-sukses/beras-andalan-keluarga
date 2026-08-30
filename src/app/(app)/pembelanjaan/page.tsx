@@ -23,17 +23,19 @@ export default function PembelanjaanPage() {
   const [showSuggest, setShowSuggest] = useState(false);
 
   function getRangeDates() {
-    const today = new Date(); const todayStr = today.toISOString().slice(0, 10);
+    const today = new Date();
+    const toLocalDate = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+    const todayStr = toLocalDate(today);
     if (range === "today") return { from: todayStr, to: todayStr };
-    if (range === "week") { const s = new Date(today); s.setDate(today.getDate() - today.getDay()); return { from: s.toISOString().slice(0, 10), to: todayStr }; }
-    if (range === "month") { const s = new Date(today.getFullYear(), today.getMonth(), 1); return { from: s.toISOString().slice(0, 10), to: todayStr }; }
+    if (range === "week") { const s = new Date(today); s.setDate(today.getDate() - today.getDay()); return { from: toLocalDate(s), to: todayStr }; }
+    if (range === "month") { const s = new Date(today.getFullYear(), today.getMonth(), 1); return { from: toLocalDate(s), to: todayStr }; }
     return { from: dateFrom, to: dateTo };
   }
 
-  const { from, to } = getRangeDates();
   const isToday = range === "today";
 
   async function fetchData() {
+    const { from, to } = getRangeDates();
     setLoading(true);
     const res = await fetch(`/api/pembelanjaan?from=${from}&to=${to}`);
     const json = await res.json();

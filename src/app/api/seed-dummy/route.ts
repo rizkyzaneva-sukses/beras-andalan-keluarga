@@ -11,6 +11,7 @@ export async function POST() {
 
   await prisma.pembayaranPiutang.deleteMany();
   await prisma.pembayaranUtang.deleteMany();
+  await prisma.auditLog.deleteMany();
   await prisma.penjualan.deleteMany();
   await prisma.piutang.deleteMany();
   await prisma.pembelanjaan.deleteMany();

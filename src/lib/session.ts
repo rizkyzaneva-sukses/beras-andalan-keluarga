@@ -7,6 +7,10 @@ export interface SessionData {
   role?: "OWNER" | "KASIR";
 }
 
+if (!process.env.SESSION_SECRET) {
+  console.warn("[SECURITY] SESSION_SECRET tidak di-set! Menggunakan default secret — JANGAN DEPLOY ke production tanpa mengatur SESSION_SECRET.");
+}
+
 export const sessionOptions: SessionOptions = {
   password: process.env.SESSION_SECRET || "change-me-to-a-random-string-at-least-32-chars-long",
   cookieName: "beras-session",

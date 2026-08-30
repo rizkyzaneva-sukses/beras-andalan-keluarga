@@ -90,5 +90,13 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
 
   await prisma.pembelanjaan.delete({ where: { id } });
 
+  // Bug #10: Revert stock if this was a RESTOCK with a linked product
+  if (record.kategori === "RESTOCK" && record.produkId) {
+    await prisma.produk.update({
+      where: { id: record.produkId },
+      data: { stok: { decrement: record.jumlah } },
+    }).catch(() => {});
+  }
+
   return NextResponse.json({ success: true });
 }

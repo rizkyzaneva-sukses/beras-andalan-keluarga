@@ -33,9 +33,21 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
     return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
   }
   const { id } = await params;
+  if (id === session.userId) {
+    return NextResponse.json({ error: "Tidak bisa menghapus akun sendiri" }, { status: 400 });
+  }
   const user = await prisma.user.findUnique({ where: { id } });
   if (!user) return NextResponse.json({ error: "User tidak ditemukan" }, { status: 404 });
   if (user.username === "owner") return NextResponse.json({ error: "Tidak bisa menghapus akun owner utama" }, { status: 400 });
+
+  // Check if user has related data — if so, soft-delete to avoid FK violations
+  const [penjualanCount, pembelanjaanCount, modalCount] = await Promise.all([
+    prisma.penjualan.count({ where: { createdBy: id } }),
+    prisma.pembelanjaan.count({ where: { createdBy: id } }),
+    prisma.modalLog.count({ where: { createdBy: id } }),
+  ]);
+  const hasRelatedData = penjualanCount + pembelanjaanCount + modalCount > 0;
+
   await writeAudit({
     entityType: "USER",
     entityId: id,
@@ -43,7 +55,14 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
     oldData: { username: user.username, role: user.role },
     userId: session.userId,
   });
-  await prisma.auditLog.updateMany({ where: { userId: id }, data: { userId: session.userId } });
-  await prisma.user.delete({ where: { id } });
+
+  if (hasRelatedData) {
+    // Soft-delete: deactivate user to preserve FK references
+    await prisma.user.update({ where: { id }, data: { isActive: false } });
+  } else {
+    // Safe to hard-delete: no dependent records
+    await prisma.auditLog.updateMany({ where: { userId: id }, data: { userId: session.userId } });
+    await prisma.user.delete({ where: { id } });
+  }
   return NextResponse.json({ success: true });
 }

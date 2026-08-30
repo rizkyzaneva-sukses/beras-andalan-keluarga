@@ -31,10 +31,12 @@ export default function ClosingPage() {
   const [data, setData] = useState<ClosingData | null>(null);
   const [omsetKasir, setOmsetKasir] = useState<OmsetKasir[]>([]);
   const [loading, setLoading] = useState(true);
-  const today = new Date().toISOString().slice(0, 10);
 
   useEffect(() => {
     async function fetchClosing() {
+      const now = new Date();
+      const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+
       const [summaryRes, penjualanRes, pembelanjaanRes, omsetRes] = await Promise.all([
         fetch(`/api/laporan/summary?from=${today}&to=${today}`).then((r) => r.json()),
         fetch(`/api/penjualan?from=${today}&to=${today}`).then((r) => r.json()),

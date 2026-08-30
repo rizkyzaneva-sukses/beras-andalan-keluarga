@@ -12,13 +12,15 @@ export async function login(username: string, password: string) {
   const valid = await bcrypt.compare(password, user.passwordHash);
   if (!valid) return { error: "Username atau password salah" };
 
+  if (!user.isActive) return { error: "Akun Anda telah dinonaktifkan" };
+
   const session = await getSession();
   session.userId = user.id;
   session.username = user.username;
   session.role = user.role;
   await session.save();
 
-  const redirectTo = user.role === "KASIR" ? "/penjualan" : "/dashboard";
+  const redirectTo = user.role === "KASIR" ? "/pos" : "/dashboard";
   return { success: true, redirectTo };
 }
 

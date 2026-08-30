@@ -44,7 +44,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       if (hargaBeli) {
         await tx.pembelanjaan.create({
           data: {
-            tanggal: new Date(`${new Date().toISOString().slice(0, 10)}T00:00:00.000Z`),
+            tanggal: new Date(new Date().toLocaleDateString("sv-SE") + "T00:00:00.000Z"),
             kategori: "RESTOCK",
             namaBarang: produk.nama,
             jumlah,

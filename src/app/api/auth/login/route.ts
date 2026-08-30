@@ -12,12 +12,16 @@ export async function POST(request: NextRequest) {
 
   const user = await prisma.user.findUnique({ where: { username } });
   if (!user) {
-    return NextResponse.json({ error: "Username atau password salah" });
+    return NextResponse.json({ error: "Username atau password salah" }, { status: 401 });
   }
 
   const valid = await bcrypt.compare(password, user.passwordHash);
   if (!valid) {
-    return NextResponse.json({ error: "Username atau password salah" });
+    return NextResponse.json({ error: "Username atau password salah" }, { status: 401 });
+  }
+
+  if (!user.isActive) {
+    return NextResponse.json({ error: "Akun Anda telah dinonaktifkan" }, { status: 403 });
   }
 
   const session = await getSession();

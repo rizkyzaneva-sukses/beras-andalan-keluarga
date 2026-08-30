@@ -12,7 +12,7 @@ export async function GET(request: NextRequest) {
   const search = searchParams.get("search") || "";
 
   const items = await prisma.pembelanjaan.findMany({
-    where: search ? { namaBarang: { contains: search } } : {},
+    where: search ? { namaBarang: { contains: search, mode: "insensitive" } } : {},
     select: { namaBarang: true },
     distinct: ["namaBarang"],
     orderBy: { namaBarang: "asc" },

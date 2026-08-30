@@ -78,37 +78,49 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: `Stok ${produkCek.nama} tidak cukup` }, { status: 400 });
   }
 
-  const penjualan = await prisma.penjualan.create({
-    data: {
-      tanggal: new Date(tanggal),
-      produkId,
-      qty,
-      hargaJual,
-      total,
-      metodeBayar,
-      hargaDisesuaikan: hargaDisesuaikan || false,
-      createdBy: session.userId,
-    },
-  });
+  const produk = await prisma.produk.findUnique({ where: { id: produkId } });
+  if (!produk) {
+    return NextResponse.json({ error: "Produk tidak ditemukan" }, { status: 404 });
+  }
+  if (produk.stok < qty) {
+    return NextResponse.json({ error: `Stok ${produk.nama} hanya ${produk.stok}` }, { status: 400 });
+  }
 
-  const produk = await prisma.produk.update({
-    where: { id: produkId },
-    data: { stok: { decrement: qty } },
-  }).catch(() => prisma.produk.findUnique({ where: { id: produkId } }));
+  const penjualan = await prisma.$transaction(async (tx) => {
+    const updated = await tx.produk.update({
+      where: { id: produkId },
+      data: { stok: { decrement: qty } },
+    });
+    if (updated.stok < 0) {
+      throw new Error("Stok tidak cukup");
+    }
+    return tx.penjualan.create({
+      data: {
+        tanggal: new Date(tanggal),
+        produkId,
+        qty,
+        hargaJual,
+        total,
+        metodeBayar,
+        hargaDisesuaikan: hargaDisesuaikan || false,
+        createdBy: session.userId!,
+      },
+    });
+  });
 
   await writeAudit({
     entityType: "PENJUALAN",
     entityId: penjualan.id,
     action: "CREATE",
     newData: {
-      produkNama: produk?.nama,
+      produkNama: produk.nama,
       qty,
       hargaJual,
       total,
       metodeBayar,
       tanggal: penjualan.tanggal,
     },
-    userId: session.userId,
+    userId: session.userId!,
   });
 
   return NextResponse.json(penjualan, { status: 201 });

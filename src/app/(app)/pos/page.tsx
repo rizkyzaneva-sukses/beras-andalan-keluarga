@@ -308,7 +308,8 @@ export default function PosPage() {
     setPaying(true);
     setPayError("");
     try {
-      const today = new Date().toISOString().slice(0, 10);
+      const now = new Date();
+      const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
       const res = await fetch("/api/penjualan/checkout", {
         method: "POST",
         headers: { "Content-Type": "application/json" },

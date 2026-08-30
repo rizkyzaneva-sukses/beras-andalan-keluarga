@@ -24,7 +24,7 @@ export async function proxy(request: NextRequest) {
   }
 
   if (session.userId && isLoginPage) {
-    const redirectTo = session.role === "KASIR" ? "/penjualan" : "/dashboard";
+    const redirectTo = session.role === "KASIR" ? "/pos" : "/dashboard";
     return NextResponse.redirect(new URL(redirectTo, request.url));
   }
 

@@ -106,24 +106,24 @@ export default function DashboardPage() {
   const [dayPage, setDayPage] = useState(1);
   const [resetting, setResetting] = useState(false);
 
-  function getRangeDates(): { from: string; to: string } {
+  const fetchData = useCallback(async () => {
+    // Inline date range calculation to avoid stale closure (Bug #9)
     const today = new Date();
-    const todayStr = today.toISOString().slice(0, 10);
-    if (range === "today") return { from: todayStr, to: todayStr };
-    if (range === "week") {
+    const toLocalDate = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+    const todayStr = toLocalDate(today);
+    let from: string, to: string;
+    if (range === "today") { from = todayStr; to = todayStr; }
+    else if (range === "week") {
       const start = new Date(today);
       start.setDate(today.getDate() - today.getDay());
-      return { from: start.toISOString().slice(0, 10), to: todayStr };
-    }
-    if (range === "month") {
+      from = toLocalDate(start); to = todayStr;
+    } else if (range === "month") {
       const start = new Date(today.getFullYear(), today.getMonth(), 1);
-      return { from: start.toISOString().slice(0, 10), to: todayStr };
+      from = toLocalDate(start); to = todayStr;
+    } else {
+      from = dateFrom; to = dateTo;
     }
-    return { from: dateFrom, to: dateTo };
-  }
 
-  const fetchData = useCallback(async () => {
-    const { from, to } = getRangeDates();
     setLoading(true);
     const [summaryRes, penjualanRes, pembelanjaanRes, perDayRes, omsetRes] = await Promise.all([
       fetch(`/api/laporan/summary?from=${from}&to=${to}`).then((r) => r.json()),

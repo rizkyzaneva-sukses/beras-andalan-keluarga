@@ -32,7 +32,10 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
   const newRecord = await prisma.penjualan.update({ where: { id }, data: { produkId, qty, hargaJual, total, metodeBayar, hargaDisesuaikan } });
 
   const qtyLama = toQty(oldRecord.qty);
-  if (qtyLama !== qty) {
+  if (oldRecord.produkId !== produkId) {
+    await prisma.produk.update({ where: { id: oldRecord.produkId }, data: { stok: { increment: qtyLama } } }).catch(() => {});
+    await prisma.produk.update({ where: { id: produkId }, data: { stok: { decrement: qty } } }).catch(() => {});
+  } else if (qtyLama !== qty) {
     const diff = toQty(qtyLama - qty);
     await prisma.produk.update({ where: { id: oldRecord.produkId }, data: { stok: { increment: diff } } }).catch(() => {});
   }
