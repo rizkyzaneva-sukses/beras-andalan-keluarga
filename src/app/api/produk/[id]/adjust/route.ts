@@ -24,6 +24,12 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   if (!produk || !produk.aktif) {
     return NextResponse.json({ error: "Produk tidak ditemukan" }, { status: 404 });
   }
+  if (produk.tipe === "GABUNGAN") {
+    return NextResponse.json(
+      { error: "SO produk gabungan tidak didukung. Sesuaikan stok komponen resepnya." },
+      { status: 400 },
+    );
+  }
 
   const stokFisik = toQty(rawFisik);
   if (!isValidStokCount(stokFisik, { allowFraction: isProdukTimbang(produk.nama) })) {

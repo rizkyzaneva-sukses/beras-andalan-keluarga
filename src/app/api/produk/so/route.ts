@@ -30,7 +30,7 @@ export async function POST(request: NextRequest) {
 
   const produkList = await prisma.produk.findMany({
     where: { aktif: true },
-    select: { id: true, nama: true, satuan: true, stok: true },
+    select: { id: true, nama: true, satuan: true, stok: true, tipe: true },
   });
   const byId = new Map(produkList.map((p) => [p.id, p]));
   const byName = new Map(produkList.map((p) => [p.nama.trim().toLowerCase(), p]));
@@ -56,6 +56,10 @@ export async function POST(request: NextRequest) {
     }
     if (seen.has(produk.id)) {
       skipped.push({ nama: produk.nama, alasan: "Baris dobel, dilewati" });
+      continue;
+    }
+    if (produk.tipe === "GABUNGAN") {
+      skipped.push({ nama: produk.nama, alasan: "Produk gabungan dilewati (stok dari resep)" });
       continue;
     }
     const stokFisik = toQty(item.stokFisik);

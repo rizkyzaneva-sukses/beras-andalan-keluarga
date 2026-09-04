@@ -17,6 +17,12 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   if (!produk || !produk.aktif) {
     return NextResponse.json({ error: "Produk tidak ditemukan" }, { status: 404 });
   }
+  if (produk.tipe === "GABUNGAN") {
+    return NextResponse.json(
+      { error: "Stok produk gabungan dihitung dari resep. Ubah stok komponen karungnya." },
+      { status: 400 },
+    );
+  }
 
   if (!["tambah", "kurang"].includes(arah) || !isValidQty(jumlah, { allowFraction: isProdukTimbang(produk.nama) })) {
     return NextResponse.json({ error: "Jumlah stok tidak valid" }, { status: 400 });

@@ -1145,9 +1145,9 @@ export default function ProdukPage() {
                       </td>
                       <td className="px-3 py-2.5 text-muted-foreground">{p.satuan}</td>
                       <td className="px-3 py-2.5 text-right font-mono">{formatRupiah(p.hargaJual)}</td>
-                      <td className={`px-3 py-2.5 text-right font-mono font-bold ${stok <= 0 ? "text-danger" : stok < 10 ? "text-warning" : "text-primary"}`}>
+                      <td className={`px-3 py-2.5 text-right font-mono font-bold ${(p.tipe === "GABUNGAN" ? toQty(p.stokGabungan ?? 0) : stok) <= 0 ? "text-danger" : (p.tipe === "GABUNGAN" ? toQty(p.stokGabungan ?? 0) : stok) < 10 ? "text-warning" : "text-primary"}`}>
                         {p.tipe === "GABUNGAN" && p.stokGabungan != null ? (
-                          <span title={`Stok gabungan: ${formatQty(p.stokGabungan)}`}>{formatQty(p.stokGabungan)}</span>
+                          <span title="Stok dihitung dari komponen resep">{formatQty(p.stokGabungan)}</span>
                         ) : (
                           formatQty(p.stok)
                         )}
@@ -1178,18 +1178,22 @@ export default function ProdukPage() {
                               className="px-2 py-1 rounded-md text-[11px] font-semibold bg-blue-50 text-blue-700"
                             >Buka 1</button>
                           )}
-                          <button type="button" onClick={() => openStock("adjust", p)} className="px-2 py-1 rounded-md text-[11px] font-semibold bg-amber-50 text-amber-800">
-                            SO
-                          </button>
-                          <button type="button" onClick={() => openStock("isi", p)} className="px-2 py-1 rounded-md text-[11px] font-semibold bg-primary-soft text-primary">
-                            Isi
-                          </button>
-                          <button type="button" onClick={() => openStock("kurang", p)} className="px-2 py-1 rounded-md text-[11px] font-semibold bg-muted text-muted-foreground">
-                            Kurangi
-                          </button>
-                          <button type="button" onClick={() => openStock("pindah", p)} className="px-2 py-1 rounded-md text-[11px] font-semibold bg-muted text-muted-foreground">
-                            Pindah
-                          </button>
+                          {p.tipe !== "GABUNGAN" && (
+                            <>
+                              <button type="button" onClick={() => openStock("adjust", p)} className="px-2 py-1 rounded-md text-[11px] font-semibold bg-amber-50 text-amber-800">
+                                SO
+                              </button>
+                              <button type="button" onClick={() => openStock("isi", p)} className="px-2 py-1 rounded-md text-[11px] font-semibold bg-primary-soft text-primary">
+                                Isi
+                              </button>
+                              <button type="button" onClick={() => openStock("kurang", p)} className="px-2 py-1 rounded-md text-[11px] font-semibold bg-muted text-muted-foreground">
+                                Kurangi
+                              </button>
+                              <button type="button" onClick={() => openStock("pindah", p)} className="px-2 py-1 rounded-md text-[11px] font-semibold bg-muted text-muted-foreground">
+                                Pindah
+                              </button>
+                            </>
+                          )}
                           <button type="button" onClick={() => openEdit(p)} className="px-2 py-1 rounded-md text-[11px] font-semibold text-primary hover:bg-primary-soft">
                             Edit
                           </button>

@@ -22,6 +22,12 @@ export async function POST(request: NextRequest) {
   if (!from || !to || !from.aktif || !to.aktif) {
     return NextResponse.json({ error: "Produk tidak ditemukan" }, { status: 404 });
   }
+  if (from.tipe === "GABUNGAN" || to.tipe === "GABUNGAN") {
+    return NextResponse.json(
+      { error: "Produk gabungan tidak bisa dipindah stok langsung. Pindahkan komponen resepnya." },
+      { status: 400 },
+    );
+  }
 
   const fromQty = toQty(rawFromQty);
   const toQtyVal = toQty(rawToQty);
