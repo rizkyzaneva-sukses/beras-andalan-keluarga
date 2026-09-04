@@ -481,9 +481,9 @@ export default function PosPage() {
                 const sisaStok = product ? availableStok(product) : 0;
                 return (
                 <div key={item.lineId} className="rounded-xl border border-border p-3 bg-background/50 space-y-2">
-                  <div className="flex items-center gap-2 sm:gap-3">
+                  <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3">
                     <div className="flex-1 min-w-0">
-                      <p className="font-medium truncate">{item.nama}</p>
+                      <p className="font-medium">{item.nama}</p>
                       <p className="text-sm text-muted-foreground font-mono">
                         {formatRupiah(item.hargaJual)}
                         {item.satuan ? ` / ${item.satuan}` : ""}
@@ -508,19 +508,19 @@ export default function PosPage() {
                       >
                         +
                       </button>
+                      <div className="text-right min-w-[72px] sm:min-w-[88px]">
+                        <p className="font-semibold font-mono text-sm sm:text-base">
+                          {formatRupiah(lineTotal(item.qty, item.hargaJual))}
+                        </p>
+                      </div>
+                      <button
+                        onClick={() => removeItem(item.lineId)}
+                        className="w-9 h-9 rounded-full bg-danger-soft text-danger font-bold flex items-center justify-center shrink-0"
+                        aria-label="Hapus"
+                      >
+                        ×
+                      </button>
                     </div>
-                    <div className="text-right min-w-[72px] sm:min-w-[88px] shrink-0">
-                      <p className="font-semibold font-mono text-sm sm:text-base">
-                        {formatRupiah(lineTotal(item.qty, item.hargaJual))}
-                      </p>
-                    </div>
-                    <button
-                      onClick={() => removeItem(item.lineId)}
-                      className="w-9 h-9 rounded-full bg-danger-soft text-danger font-bold flex items-center justify-center shrink-0"
-                      aria-label="Hapus"
-                    >
-                      ×
-                    </button>
                   </div>
                   {timbang && (
                     <div className="flex flex-wrap gap-1.5">
