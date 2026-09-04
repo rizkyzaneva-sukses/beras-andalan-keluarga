@@ -158,12 +158,38 @@ export default function ProdukPage() {
     setStockError("");
   }
 
+  const hargaBeliGabunganPreview = useMemo(() => {
+    if (formTipe !== "GABUNGAN") return 0;
+    let total = 0;
+    for (const k of formKomposisi) {
+      if (!k.sumberId) continue;
+      const sumber = produk.find((p) => p.id === k.sumberId);
+      if (!sumber) continue;
+      const qty = Number(k.qtyPerBatch) || 0;
+      if (qty <= 0) continue;
+      const unit = sumber.hppRataRata > 0 ? sumber.hppRataRata : sumber.hargaBeli;
+      total += Math.round(unit) * qty;
+    }
+    return Math.round(total);
+  }, [formTipe, formKomposisi, produk]);
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError("");
+    if (formTipe === "GABUNGAN") {
+      const resep = formKomposisi.filter((k) => k.sumberId && Number(k.qtyPerBatch) > 0);
+      if (resep.length === 0) {
+        setError("Produk gabungan harus punya minimal 1 komposisi");
+        return;
+      }
+      if (!hargaBeliGabunganPreview || hargaBeliGabunganPreview <= 0) {
+        setError("Harga beli dari resep belum valid — cek komponen");
+        return;
+      }
+    }
     const body = {
       ...form,
-      hargaBeli: Number(digitsOnly(form.hargaBeli)),
+      hargaBeli: formTipe === "GABUNGAN" ? hargaBeliGabunganPreview : Number(digitsOnly(form.hargaBeli)),
       hargaJual: Number(digitsOnly(form.hargaJual)),
       tipe: formTipe,
       isiPerKarung: formTipe === "KARUNG" ? Number(formIsiPerKarung) : undefined,
@@ -731,18 +757,20 @@ export default function ProdukPage() {
               allowClear={false}
             />
           </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-sm font-medium mb-1">Harga Beli (Rp)</label>
-              <input
-                type="text"
-                inputMode="numeric"
-                value={formatRibuan(digitsOnly(form.hargaBeli))}
-                onChange={(e) => setForm({ ...form, hargaBeli: digitsOnly(e.target.value) })}
-                required
-                className="w-full px-3 py-2.5 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary font-mono"
-              />
-            </div>
+          <div className={`grid gap-3 ${formTipe === "GABUNGAN" ? "grid-cols-1" : "grid-cols-2"}`}>
+            {formTipe !== "GABUNGAN" && (
+              <div>
+                <label className="block text-sm font-medium mb-1">Harga Beli (Rp)</label>
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  value={formatRibuan(digitsOnly(form.hargaBeli))}
+                  onChange={(e) => setForm({ ...form, hargaBeli: digitsOnly(e.target.value) })}
+                  required
+                  className="w-full px-3 py-2.5 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary font-mono"
+                />
+              </div>
+            )}
             <div>
               <label className="block text-sm font-medium mb-1">Harga Jual (Rp)</label>
               <input
@@ -755,6 +783,16 @@ export default function ProdukPage() {
               />
             </div>
           </div>
+
+          {formTipe === "GABUNGAN" && (
+            <div className="rounded-lg border border-purple-200 bg-purple-50 px-3 py-2.5">
+              <p className="text-sm font-medium text-purple-900">Harga Beli (otomatis dari resep)</p>
+              <p className="font-mono text-[15px] font-semibold text-purple-800 mt-0.5">
+                {hargaBeliGabunganPreview > 0 ? formatRupiah(hargaBeliGabunganPreview) : "— isi resep dulu"}
+              </p>
+              <p className="text-[11px] text-purple-700/80 mt-1">Σ (HPP/harga beli komponen × qty per batch)</p>
+            </div>
+          )}
 
           {/* KARUNG: isi per karung */}
           {formTipe === "KARUNG" && (

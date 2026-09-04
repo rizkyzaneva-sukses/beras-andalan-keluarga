@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/session";
 import { writeAudit } from "@/lib/audit";
 import { toQty } from "@/lib/qty";
+import { resolveHargaBeliGabungan } from "@/lib/harga-beli-gabungan";
 
 export async function GET() {
   const session = await getSession();
@@ -71,11 +72,14 @@ export async function POST(request: NextRequest) {
   const body = await request.json();
   const { nama, satuan, hargaBeli, hargaJual, tipe, isiPerKarung, sumberProdukId, komposisi } = body;
 
-  if (!nama || !satuan || !hargaBeli || !hargaJual) {
+  const tipE = tipe || "KARUNG";
+
+  if (!nama || !satuan || !hargaJual) {
     return NextResponse.json({ error: "Semua field wajib diisi" }, { status: 400 });
   }
-
-  const tipE = tipe || "KARUNG";
+  if (tipE !== "GABUNGAN" && (hargaBeli == null || hargaBeli === "")) {
+    return NextResponse.json({ error: "Harga beli wajib diisi" }, { status: 400 });
+  }
 
   if (tipE === "ECERAN" && !sumberProdukId) {
     return NextResponse.json({ error: "Produk eceran harus punya sumber karung" }, { status: 400 });
@@ -84,11 +88,26 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Produk gabungan harus punya minimal 1 komposisi" }, { status: 400 });
   }
 
+  let finalHargaBeli = Number(hargaBeli);
+  if (tipE === "GABUNGAN") {
+    try {
+      finalHargaBeli = await resolveHargaBeliGabungan(prisma, komposisi);
+    } catch (e) {
+      return NextResponse.json(
+        { error: e instanceof Error ? e.message : "Gagal hitung harga beli dari resep" },
+        { status: 400 },
+      );
+    }
+    if (!finalHargaBeli || finalHargaBeli <= 0) {
+      return NextResponse.json({ error: "Harga beli dari resep tidak valid" }, { status: 400 });
+    }
+  }
+
   const produk = await prisma.produk.create({
     data: {
       nama,
       satuan,
-      hargaBeli: Number(hargaBeli),
+      hargaBeli: finalHargaBeli,
       hargaJual: Number(hargaJual),
       tipe: tipE,
       isiPerKarung: tipE === "KARUNG" && isiPerKarung ? Number(isiPerKarung) : null,
@@ -109,7 +128,7 @@ export async function POST(request: NextRequest) {
     entityType: "PRODUK",
     entityId: produk.id,
     action: "CREATE",
-    newData: { nama, satuan, hargaBeli, hargaJual, tipe: tipE },
+    newData: { nama, satuan, hargaBeli: finalHargaBeli, hargaJual, tipe: tipE },
     userId: session.userId,
   });
 

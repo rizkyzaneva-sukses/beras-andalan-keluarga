@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/session";
 import { diffFields, writeAudit } from "@/lib/audit";
 import { toQty } from "@/lib/qty";
+import { resolveHargaBeliGabungan } from "@/lib/harga-beli-gabungan";
 
 export async function PUT(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const session = await getSession();
@@ -17,22 +18,48 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
   const body = await request.json();
   const { nama, satuan, hargaBeli, hargaJual, tipe, isiPerKarung, sumberProdukId, komposisi } = body;
 
+  const tipE = tipe || oldRecord.tipe;
+  let finalHargaBeli = hargaBeli != null ? Number(hargaBeli) : oldRecord.hargaBeli;
+
+  if (tipE === "GABUNGAN") {
+    const resep = Array.isArray(komposisi)
+      ? komposisi
+      : (
+          await prisma.komposisiProduk.findMany({
+            where: { produkId: id },
+            select: { sumberId: true, qtyPerBatch: true },
+          })
+        ).map((k) => ({ sumberId: k.sumberId, qtyPerBatch: Number(k.qtyPerBatch) }));
+
+    try {
+      finalHargaBeli = await resolveHargaBeliGabungan(prisma, resep);
+    } catch (e) {
+      return NextResponse.json(
+        { error: e instanceof Error ? e.message : "Gagal hitung harga beli dari resep" },
+        { status: 400 },
+      );
+    }
+    if (!finalHargaBeli || finalHargaBeli <= 0) {
+      return NextResponse.json({ error: "Harga beli dari resep tidak valid" }, { status: 400 });
+    }
+  }
+
   // Update base product
   const produk = await prisma.produk.update({
     where: { id },
     data: {
       nama,
       satuan,
-      hargaBeli: hargaBeli != null ? Number(hargaBeli) : undefined,
+      hargaBeli: finalHargaBeli,
       hargaJual: hargaJual != null ? Number(hargaJual) : undefined,
-      tipe: tipe || undefined,
-      isiPerKarung: tipe === "KARUNG" && isiPerKarung ? Number(isiPerKarung) : tipe === "ECERAN" || tipe === "GABUNGAN" ? null : undefined,
-      sumberProdukId: tipe === "ECERAN" ? sumberProdukId : tipe === "GABUNGAN" || tipe === "KARUNG" ? null : undefined,
+      tipe: tipE,
+      isiPerKarung: tipE === "KARUNG" && isiPerKarung ? Number(isiPerKarung) : tipE === "ECERAN" || tipE === "GABUNGAN" ? null : undefined,
+      sumberProdukId: tipE === "ECERAN" ? sumberProdukId : tipE === "GABUNGAN" || tipE === "KARUNG" ? null : undefined,
     },
   });
 
   // Update komposisi if GABUNGAN
-  if (tipe === "GABUNGAN" && Array.isArray(komposisi)) {
+  if (tipE === "GABUNGAN" && Array.isArray(komposisi)) {
     // Delete old, create new
     await prisma.komposisiProduk.deleteMany({ where: { produkId: id } });
     if (komposisi.length > 0) {
@@ -44,7 +71,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
         })),
       });
     }
-  } else if (tipe === "ECERAN" || tipe === "KARUNG") {
+  } else if (tipE === "ECERAN" || tipE === "KARUNG") {
     // Remove any komposisi if switching away from GABUNGAN
     await prisma.komposisiProduk.deleteMany({ where: { produkId: id } });
   }
