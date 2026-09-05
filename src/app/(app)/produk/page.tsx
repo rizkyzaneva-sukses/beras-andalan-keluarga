@@ -4,6 +4,12 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Html5Qrcode } from "html5-qrcode";
 import { Product, StokAdjustmentEntry, TipeProduk } from "@/types";
 import { digitsOnly, formatRibuan, formatRupiah } from "@/lib/money";
+import {
+  formatKarungQty,
+  hitungHppGabungan,
+  isKelipatanSetengahKarung,
+  langkahKarung,
+} from "@/lib/gabungan";
 import { formatQty, isProdukTimbang, parseQtyInput, sanitizeQtyInput, toQty } from "@/lib/qty";
 import { CONTOH_CSV, parseTabelProduk, validateBarisImport, validateBarisSo } from "@/lib/import-tabel";
 import { SearchSelect } from "@/components/SearchSelect";
@@ -158,43 +164,61 @@ export default function ProdukPage() {
     setStockError("");
   }
 
-  const hargaBeliGabunganPreview = useMemo(() => {
-    if (formTipe !== "GABUNGAN") return 0;
-    let total = 0;
-    for (const k of formKomposisi) {
-      if (!k.sumberId) continue;
+  const hppGabunganPreview = useMemo(() => {
+    if (formTipe !== "GABUNGAN") return { totalBiaya: 0, totalKg: 0, hppPerKg: 0 };
+    const items = formKomposisi.flatMap((k) => {
+      if (!k.sumberId) return [];
       const sumber = produk.find((p) => p.id === k.sumberId);
-      if (!sumber) continue;
-      const qty = Number(k.qtyPerBatch) || 0;
-      if (qty <= 0) continue;
-      const unit = sumber.hppRataRata > 0 ? sumber.hppRataRata : sumber.hargaBeli;
-      total += Math.round(unit) * qty;
-    }
-    return Math.round(total);
+      if (!sumber) return [];
+      const qty = parseQtyInput(k.qtyPerBatch);
+      if (!Number.isFinite(qty) || qty <= 0) return [];
+      return [
+        {
+          qtyPerBatch: qty,
+          hargaBeli: sumber.hargaBeli,
+          hppRataRata: sumber.hppRataRata,
+          isiPerKarung: sumber.isiPerKarung,
+        },
+      ];
+    });
+    return hitungHppGabungan(items);
   }, [formTipe, formKomposisi, produk]);
+  const hargaBeliGabunganPreview = hppGabunganPreview.hppPerKg;
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError("");
     if (formTipe === "GABUNGAN") {
-      const resep = formKomposisi.filter((k) => k.sumberId && Number(k.qtyPerBatch) > 0);
+      const resep = formKomposisi
+        .map((k) => ({ sumberId: k.sumberId, qty: parseQtyInput(k.qtyPerBatch) }))
+        .filter((k) => k.sumberId && Number.isFinite(k.qty) && k.qty > 0);
       if (resep.length === 0) {
         setError("Produk gabungan harus punya minimal 1 komposisi");
         return;
       }
-      if (!hargaBeliGabunganPreview || hargaBeliGabunganPreview <= 0) {
-        setError("Harga beli dari resep belum valid — cek komponen");
+      if (resep.some((k) => !isKelipatanSetengahKarung(k.qty))) {
+        setError("Jumlah campuran harus kelipatan ½ karung atau 1 karung");
+        return;
+      }
+      if (!hargaBeliGabunganPreview || hargaBeliGabunganPreview <= 0 || hppGabunganPreview.totalKg <= 0) {
+        setError("HPP dari resep belum valid — cek komponen dan isi per karung");
         return;
       }
     }
     const body = {
       ...form,
+      satuan: formTipe === "GABUNGAN" ? "kg" : form.satuan,
       hargaBeli: formTipe === "GABUNGAN" ? hargaBeliGabunganPreview : Number(digitsOnly(form.hargaBeli)),
       hargaJual: Number(digitsOnly(form.hargaJual)),
       tipe: formTipe,
       isiPerKarung: formTipe === "KARUNG" ? Number(formIsiPerKarung) : undefined,
       sumberProdukId: formTipe === "ECERAN" ? formSumberId : undefined,
-      komposisi: formTipe === "GABUNGAN" ? formKomposisi.filter((k) => k.sumberId).map((k) => ({ sumberId: k.sumberId, qtyPerBatch: Number(k.qtyPerBatch) })) : undefined,
+      komposisi:
+        formTipe === "GABUNGAN"
+          ? formKomposisi
+              .filter((k) => k.sumberId)
+              .map((k) => ({ sumberId: k.sumberId, qtyPerBatch: parseQtyInput(k.qtyPerBatch) }))
+          : undefined,
     };
     const url = editId ? `/api/produk/${editId}` : "/api/produk";
     const method = editId ? "PUT" : "POST";
@@ -727,7 +751,13 @@ export default function ProdukPage() {
                 <button
                   key={t.value}
                   type="button"
-                  onClick={() => setFormTipe(t.value)}
+                  onClick={() => {
+                    setFormTipe(t.value);
+                    if (t.value === "GABUNGAN") {
+                      setForm((prev) => ({ ...prev, satuan: "kg" }));
+                      setFormKomposisi((prev) => (prev.length ? prev : [{ sumberId: "", qtyPerBatch: "1" }]));
+                    }
+                  }}
                   className={`py-2.5 rounded-lg text-xs font-semibold border ${formTipe === t.value ? "bg-primary text-white border-primary" : "border-border text-muted-foreground"}`}
                 >
                   <span className="block">{t.label}</span>
@@ -747,6 +777,7 @@ export default function ProdukPage() {
               placeholder={formTipe === "KARUNG" ? "Beras Pandan Wangi" : formTipe === "ECERAN" ? "Beras Ecer Pandan" : "Syalala (campuran)"}
             />
           </div>
+          {formTipe !== "GABUNGAN" && (
           <div>
             <label className="block text-sm font-medium mb-1">Satuan</label>
             <SearchSelect
@@ -757,6 +788,7 @@ export default function ProdukPage() {
               allowClear={false}
             />
           </div>
+          )}
           <div className={`grid gap-3 ${formTipe === "GABUNGAN" ? "grid-cols-1" : "grid-cols-2"}`}>
             {formTipe !== "GABUNGAN" && (
               <div>
@@ -772,7 +804,9 @@ export default function ProdukPage() {
               </div>
             )}
             <div>
-              <label className="block text-sm font-medium mb-1">Harga Jual (Rp)</label>
+              <label className="block text-sm font-medium mb-1">
+                {formTipe === "GABUNGAN" ? "Harga Jual per kg (Rp)" : "Harga Jual (Rp)"}
+              </label>
               <input
                 type="text"
                 inputMode="numeric"
@@ -785,12 +819,19 @@ export default function ProdukPage() {
           </div>
 
           {formTipe === "GABUNGAN" && (
-            <div className="rounded-lg border border-purple-200 bg-purple-50 px-3 py-2.5">
-              <p className="text-sm font-medium text-purple-900">Harga Beli (otomatis dari resep)</p>
-              <p className="font-mono text-[15px] font-semibold text-purple-800 mt-0.5">
-                {hargaBeliGabunganPreview > 0 ? formatRupiah(hargaBeliGabunganPreview) : "— isi resep dulu"}
+            <div className="rounded-lg border border-purple-200 bg-purple-50 px-3 py-2.5 space-y-1">
+              <p className="text-sm font-medium text-purple-900">HPP per kg (otomatis dari resep)</p>
+              <p className="font-mono text-[15px] font-semibold text-purple-800">
+                {hargaBeliGabunganPreview > 0 ? `${formatRupiah(hargaBeliGabunganPreview)} / kg` : "— isi resep dulu"}
               </p>
-              <p className="text-[11px] text-purple-700/80 mt-1">Σ (HPP/harga beli komponen × qty per batch)</p>
+              {hppGabunganPreview.totalKg > 0 && (
+                <p className="text-[11px] text-purple-800">
+                  Modal {formatRupiah(hppGabunganPreview.totalBiaya)} ÷ {formatQty(hppGabunganPreview.totalKg)} kg
+                </p>
+              )}
+              <p className="text-[11px] text-purple-700/80">
+                Campuran kelipatan ½ karung. Contoh: A 1 + B 1 + C ½ karung (25 kg) = 62,5 kg → Rp 250.000 / 62,5 kg.
+              </p>
             </div>
           )}
 
@@ -832,46 +873,90 @@ export default function ProdukPage() {
           {/* GABUNGAN: resep komposisi */}
           {formTipe === "GABUNGAN" && (
             <div>
-              <label className="block text-sm font-medium mb-1">Resep Komposisi</label>
-              <p className="text-[11px] text-muted-foreground mb-2">Pilih karung yang jadi bahan + berapa karung per batch</p>
+              <label className="block text-sm font-medium mb-1">Resep Campuran</label>
+              <p className="text-[11px] text-muted-foreground mb-2">Pilih beras karung + jumlah (kelipatan ½ karung)</p>
               <div className="space-y-2">
-                {formKomposisi.map((k, i) => (
-                  <div key={i} className="flex gap-2 items-center">
-                    <SearchSelect
-                      className="flex-1 min-w-0"
-                      value={k.sumberId}
-                      onChange={(v) => {
-                        const next = [...formKomposisi];
-                        next[i] = { ...next[i], sumberId: v };
-                        setFormKomposisi(next);
-                      }}
-                      placeholder="Cari karung..."
-                      options={karungList.map((kr) => ({
-                        value: kr.id,
-                        label: kr.nama,
-                        description: `stok ${formatQty(kr.stok)} karung`,
-                      }))}
-                    />
-                    <input
-                      type="text"
-                      inputMode="numeric"
-                      value={k.qtyPerBatch}
-                      onChange={(e) => {
-                        const next = [...formKomposisi];
-                        next[i] = { ...next[i], qtyPerBatch: digitsOnly(e.target.value) };
-                        setFormKomposisi(next);
-                      }}
-                      className="w-20 px-2 py-2 border border-border rounded-lg font-mono text-sm text-center"
-                      placeholder="1"
-                    />
-                    <span className="text-xs text-muted-foreground whitespace-nowrap">karung</span>
-                    <button
-                      type="button"
-                      onClick={() => setFormKomposisi(formKomposisi.filter((_, j) => j !== i))}
-                      className="text-danger text-sm font-bold px-2"
-                    >×</button>
+                {formKomposisi.map((k, i) => {
+                  const sumber = karungList.find((kr) => kr.id === k.sumberId);
+                  const qty = parseQtyInput(k.qtyPerBatch);
+                  const qtyOk = Number.isFinite(qty) && isKelipatanSetengahKarung(qty);
+                  return (
+                  <div key={i} className="space-y-1">
+                    <div className="flex gap-2 items-center">
+                      <SearchSelect
+                        className="flex-1 min-w-0"
+                        value={k.sumberId}
+                        onChange={(v) => {
+                          const next = [...formKomposisi];
+                          next[i] = { ...next[i], sumberId: v };
+                          setFormKomposisi(next);
+                        }}
+                        placeholder="Cari karung..."
+                        options={karungList.map((kr) => ({
+                          value: kr.id,
+                          label: kr.nama,
+                          description: `${formatRupiah(kr.hppRataRata > 0 ? kr.hppRataRata : kr.hargaBeli)}/karung · ${formatQty(kr.isiPerKarung || 25)} kg`,
+                        }))}
+                      />
+                      <div className="flex items-center gap-1 shrink-0">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const next = [...formKomposisi];
+                            next[i] = { ...next[i], qtyPerBatch: String(langkahKarung(qtyOk ? qty : 1, -1)) };
+                            setFormKomposisi(next);
+                          }}
+                          className="w-8 h-8 rounded-lg border border-border bg-muted text-sm font-bold"
+                          aria-label="Kurangi setengah karung"
+                        >
+                          −
+                        </button>
+                        <input
+                          type="text"
+                          inputMode="decimal"
+                          value={k.qtyPerBatch}
+                          onChange={(e) => {
+                            const next = [...formKomposisi];
+                            next[i] = { ...next[i], qtyPerBatch: sanitizeQtyInput(e.target.value) };
+                            setFormKomposisi(next);
+                          }}
+                          className="w-14 px-1 py-2 border border-border rounded-lg font-mono text-sm text-center"
+                          placeholder="1"
+                          aria-label="Jumlah karung"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const next = [...formKomposisi];
+                            next[i] = { ...next[i], qtyPerBatch: String(langkahKarung(qtyOk ? qty : 0.5, 1)) };
+                            setFormKomposisi(next);
+                          }}
+                          className="w-8 h-8 rounded-lg border border-border bg-muted text-sm font-bold"
+                          aria-label="Tambah setengah karung"
+                        >
+                          +
+                        </button>
+                      </div>
+                      <span className="text-xs text-muted-foreground whitespace-nowrap w-14">
+                        {qtyOk ? formatKarungQty(qty) : "—"} karung
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setFormKomposisi(formKomposisi.filter((_, j) => j !== i))}
+                        className="text-danger text-sm font-bold px-2"
+                      >×</button>
+                    </div>
+                    {k.qtyPerBatch && !qtyOk && (
+                      <p className="text-[11px] text-danger">Pakai ½, 1, 1½, 2, … karung</p>
+                    )}
+                    {sumber && qtyOk && (
+                      <p className="text-[11px] text-muted-foreground">
+                        {formatQty(toQty(sumber.isiPerKarung || 25) * qty)} kg · modal {formatRupiah(Math.round((sumber.hppRataRata > 0 ? sumber.hppRataRata : sumber.hargaBeli) * qty))}
+                      </p>
+                    )}
                   </div>
-                ))}
+                  );
+                })}
               </div>
               <button
                 type="button"
@@ -1168,7 +1253,10 @@ export default function ProdukPage() {
                             <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-purple-100 text-purple-700">Gabungan</span>
                           )}
                         </div>
-                        <p className="text-[11px] text-muted-foreground">Beli {formatRupiah(p.hargaBeli)}</p>
+                        <p className="text-[11px] text-muted-foreground">
+                          Beli {formatRupiah(p.hargaBeli)}
+                          {p.tipe === "GABUNGAN" ? "/kg" : ""}
+                        </p>
                         {p.tipe === "KARUNG" && p.isiPerKarung && (
                           <p className="text-[11px] text-blue-600">1 karung = {formatQty(p.isiPerKarung)} kg</p>
                         )}
@@ -1176,8 +1264,12 @@ export default function ProdukPage() {
                           <p className="text-[11px] text-green-600">← {p.sumberProdukNama}</p>
                         )}
                         {p.tipe === "GABUNGAN" && p.komposisi && p.komposisi.length > 0 && (
-                          <p className="text-[11px] text-purple-600 truncate" title={p.komposisi.map((k) => `${k.sumberNama}(${k.qtyPerBatch})`).join(" + ")}>
-                            Resep: {p.komposisi.map((k) => `${k.sumberNama}(${k.qtyPerBatch})`).join(" + ")}
+                          <p
+                            className="text-[11px] text-purple-600 truncate"
+                            title={p.komposisi.map((k) => `${k.sumberNama} ${formatKarungQty(k.qtyPerBatch)} karung`).join(" + ")}
+                          >
+                            {p.komposisi.map((k) => `${k.sumberNama} ${formatKarungQty(k.qtyPerBatch)}`).join(" + ")}
+                            {p.totalKgResep ? ` · ${formatQty(p.totalKgResep)} kg` : ""}
                           </p>
                         )}
                       </td>

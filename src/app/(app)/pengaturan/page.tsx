@@ -52,7 +52,7 @@ const SOLVED_PROBLEMS = [
     problem:
       "Beras racikan (misal: 50% Ramos + 50% Pandan Wangi) sulit dikurangi stok bahan mentahnya secara manual tiap kali ada pembelian di kasir.",
     solution:
-      "Sistem resep komposisi otomatis memotong stok masing-masing bahan mentah sumber secara proporsional setiap kali beras racikan terjual di POS.",
+      "Resep campuran kelipatan ½ karung. HPP per kg dihitung otomatis (total modal ÷ total kg), dan stok karung komponen terpotong proporsional setiap kali racikan terjual di POS.",
   },
   {
     id: "kasir-closing",

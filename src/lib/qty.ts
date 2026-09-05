@@ -12,6 +12,12 @@ export function isProdukTimbang(nama: string) {
   return /telur/i.test(nama || "");
 }
 
+/** Qty boleh pecahan: telur (timbang) atau beras gabungan (dijual per kg). */
+export function allowsFractionQty(product: { nama?: string | null; tipe?: string | null }) {
+  if (product.tipe === "GABUNGAN") return true;
+  return isProdukTimbang(product.nama || "");
+}
+
 export function roundQty(n: number) {
   if (!Number.isFinite(n)) return 0;
   return Math.round(n * QTY_FACTOR) / QTY_FACTOR;

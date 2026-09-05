@@ -1,4 +1,5 @@
 import { Prisma, PrismaClient } from "@prisma/client";
+import { totalKgResep } from "@/lib/gabungan";
 import { hasEnoughStock, toQty } from "@/lib/qty";
 
 type DbClient = PrismaClient | Prisma.TransactionClient;
@@ -11,7 +12,7 @@ export type ProdukStokMeta = {
   komposisiResep: {
     sumberId: string;
     qtyPerBatch: Prisma.Decimal | number | string;
-    sumber?: { id: string; nama: string; satuan: string | null };
+    sumber?: { id: string; nama: string; satuan: string | null; isiPerKarung?: Prisma.Decimal | number | string | null };
   }[];
 };
 
@@ -31,9 +32,20 @@ export function expandStokDelta(meta: ProdukStokMeta, qtyDelta: number): StokDel
     if (!meta.komposisiResep.length) {
       throw new Error(`STOK:${meta.nama} belum punya komposisi`);
     }
+    const totalKg = totalKgResep(
+      meta.komposisiResep.map((k) => ({
+        qtyPerBatch: k.qtyPerBatch,
+        isiPerKarung: k.sumber?.isiPerKarung,
+      })),
+    );
+    if (totalKg <= 0) {
+      throw new Error(`STOK:${meta.nama} resep belum punya isi per karung`);
+    }
+    // qty = kg terjual; potong karung proporsional terhadap total kg resep.
+    const rasio = qty / totalKg;
     return meta.komposisiResep.map((k) => ({
       produkId: k.sumberId,
-      delta: toQty(qty * toQty(k.qtyPerBatch)),
+      delta: toQty(rasio * toQty(k.qtyPerBatch)),
       nama: k.sumber?.nama || meta.nama,
       satuan: k.sumber?.satuan || "",
     }));
@@ -107,7 +119,7 @@ export async function loadProdukStokMeta(tx: DbClient, ids: string[]) {
         select: {
           sumberId: true,
           qtyPerBatch: true,
-          sumber: { select: { id: true, nama: true, satuan: true } },
+          sumber: { select: { id: true, nama: true, satuan: true, isiPerKarung: true } },
         },
       },
     },

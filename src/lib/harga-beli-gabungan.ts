@@ -1,5 +1,6 @@
 import { Prisma, PrismaClient } from "@prisma/client";
 import { toQty } from "@/lib/qty";
+import { hitungHppGabungan, isKelipatanSetengahKarung, type QtyInput } from "@/lib/gabungan";
 
 type DbClient = PrismaClient | Prisma.TransactionClient;
 
@@ -8,28 +9,13 @@ export type KomposisiInput = {
   qtyPerBatch: number | string;
 };
 
-/** Harga satuan komponen: pakai HPP rata-rata kalau ada, fallback harga beli. */
-export function unitCostKomponen(p: { hargaBeli: number; hppRataRata?: number | null }) {
-  const hpp = Number(p.hppRataRata ?? 0);
-  if (Number.isFinite(hpp) && hpp > 0) return Math.round(hpp);
-  return Math.round(Number(p.hargaBeli) || 0);
-}
+export { hitungHppGabungan, unitCostKomponen } from "@/lib/gabungan";
 
-/**
- * Harga beli 1 unit produk GABUNGAN = Σ (harga satuan komponen × qty per batch).
- * Satuan mengikuti stok komponen (kg/karung/pcs) — sama seperti pemotongan stok resep.
- */
+/** @deprecated pakai hitungHppGabungan — hasilnya HPP per kg, bukan total batch. */
 export function hitungHargaBeliDariKomposisi(
-  items: { qtyPerBatch: number | string; hargaBeli: number; hppRataRata?: number | null }[],
+  items: { qtyPerBatch: QtyInput; hargaBeli: number; hppRataRata?: number | null; isiPerKarung?: QtyInput }[],
 ) {
-  if (!items.length) return 0;
-  let total = 0;
-  for (const item of items) {
-    const qty = toQty(item.qtyPerBatch);
-    if (qty <= 0) continue;
-    total += unitCostKomponen(item) * qty;
-  }
-  return Math.round(total);
+  return hitungHppGabungan(items).hppPerKg;
 }
 
 export async function resolveHargaBeliGabungan(tx: DbClient, komposisi: KomposisiInput[]) {
@@ -41,10 +27,16 @@ export async function resolveHargaBeliGabungan(tx: DbClient, komposisi: Komposis
     throw new Error("Produk gabungan harus punya minimal 1 komposisi");
   }
 
+  for (const k of cleaned) {
+    if (!isKelipatanSetengahKarung(k.qtyPerBatch)) {
+      throw new Error("Jumlah campuran harus kelipatan ½ karung atau 1 karung");
+    }
+  }
+
   const ids = [...new Set(cleaned.map((k) => k.sumberId))];
   const sumberList = await tx.produk.findMany({
     where: { id: { in: ids }, aktif: true },
-    select: { id: true, nama: true, hargaBeli: true, hppRataRata: true },
+    select: { id: true, nama: true, tipe: true, hargaBeli: true, hppRataRata: true, isiPerKarung: true },
   });
   const byId = new Map(sumberList.map((s) => [s.id, s]));
 
@@ -53,14 +45,26 @@ export async function resolveHargaBeliGabungan(tx: DbClient, komposisi: Komposis
     throw new Error("Komponen resep tidak ditemukan / nonaktif");
   }
 
-  return hitungHargaBeliDariKomposisi(
+  const bukanKarung = sumberList.filter((s) => s.tipe !== "KARUNG");
+  if (bukanKarung.length) {
+    throw new Error(`Komponen resep harus produk karung (${bukanKarung.map((s) => s.nama).join(", ")})`);
+  }
+
+  const hpp = hitungHppGabungan(
     cleaned.map((k) => {
       const s = byId.get(k.sumberId)!;
       return {
         qtyPerBatch: k.qtyPerBatch,
         hargaBeli: s.hargaBeli,
         hppRataRata: s.hppRataRata,
+        isiPerKarung: s.isiPerKarung,
       };
     }),
   );
+
+  if (!hpp.hppPerKg || hpp.hppPerKg <= 0 || hpp.totalKg <= 0) {
+    throw new Error("HPP dari resep tidak valid — cek harga beli dan isi per karung komponen");
+  }
+
+  return hpp;
 }

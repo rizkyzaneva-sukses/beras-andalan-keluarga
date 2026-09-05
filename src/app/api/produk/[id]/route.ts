@@ -20,6 +20,8 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
 
   const tipE = tipe || oldRecord.tipe;
   let finalHargaBeli = hargaBeli != null ? Number(hargaBeli) : oldRecord.hargaBeli;
+  let finalSatuan = satuan;
+  let finalHpp: number | undefined;
 
   if (tipE === "GABUNGAN") {
     const resep = Array.isArray(komposisi)
@@ -32,16 +34,16 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
         ).map((k) => ({ sumberId: k.sumberId, qtyPerBatch: Number(k.qtyPerBatch) }));
 
     try {
-      finalHargaBeli = await resolveHargaBeliGabungan(prisma, resep);
+      const hpp = await resolveHargaBeliGabungan(prisma, resep);
+      finalHargaBeli = hpp.hppPerKg;
+      finalHpp = hpp.hppPerKg;
     } catch (e) {
       return NextResponse.json(
         { error: e instanceof Error ? e.message : "Gagal hitung harga beli dari resep" },
         { status: 400 },
       );
     }
-    if (!finalHargaBeli || finalHargaBeli <= 0) {
-      return NextResponse.json({ error: "Harga beli dari resep tidak valid" }, { status: 400 });
-    }
+    finalSatuan = "kg";
   }
 
   // Update base product
@@ -49,9 +51,10 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     where: { id },
     data: {
       nama,
-      satuan,
+      satuan: finalSatuan,
       hargaBeli: finalHargaBeli,
       hargaJual: hargaJual != null ? Number(hargaJual) : undefined,
+      hppRataRata: finalHpp,
       tipe: tipE,
       isiPerKarung: tipE === "KARUNG" && isiPerKarung ? Number(isiPerKarung) : tipE === "ECERAN" || tipE === "GABUNGAN" ? null : undefined,
       sumberProdukId: tipE === "ECERAN" ? sumberProdukId : tipE === "GABUNGAN" || tipE === "KARUNG" ? null : undefined,

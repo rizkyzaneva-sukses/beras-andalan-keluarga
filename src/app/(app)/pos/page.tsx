@@ -5,6 +5,7 @@ import { Html5Qrcode } from "html5-qrcode";
 import { digitsOnly, formatRibuan, formatRupiah } from "@/lib/money";
 import {
   TELUR_PRESETS,
+  allowsFractionQty,
   availableStok,
   formatQty,
   hasEnoughStock,
@@ -35,6 +36,7 @@ interface CartItem {
   hargaJual: number;
   qty: number;
   hargaDisesuaikan: boolean;
+  tipe?: "KARUNG" | "ECERAN" | "GABUNGAN";
 }
 
 function newLineId() {
@@ -123,8 +125,9 @@ export default function PosPage() {
       setPayError(stockEmptyMessage(product));
       return;
     }
-    const step = isProdukTimbang(product.nama) ? Math.min(1, stok) : 1;
-    if (!isProdukTimbang(product.nama) && !hasEnoughStock(stok, 1)) {
+    const fraction = allowsFractionQty(product);
+    const step = fraction ? Math.min(1, stok) : 1;
+    if (!fraction && !hasEnoughStock(stok, 1)) {
       setPayError(`Stok ${product.nama} hanya ${formatQty(stok)} ${product.satuan}`);
       return;
     }
@@ -151,6 +154,7 @@ export default function PosPage() {
           hargaJual: product.hargaJual,
           qty: step,
           hargaDisesuaikan: false,
+          tipe: product.tipe,
         },
       ];
     });
@@ -271,8 +275,9 @@ export default function PosPage() {
     setCart((prev) => prev.filter((item) => item.lineId !== lineId));
 
   const openEdit = (item: CartItem) => {
+    const product = produk.find((p) => p.id === item.produkId);
     setEditId(item.lineId);
-    setEditQty(isProdukTimbang(item.nama) ? formatQty(item.qty) : String(item.qty));
+    setEditQty(allowsFractionQty(product || item) ? formatQty(item.qty) : String(item.qty));
     setEditHarga(String(item.hargaJual));
     setEditTotal(String(lineTotal(item.qty, item.hargaJual)));
   };
@@ -281,11 +286,11 @@ export default function PosPage() {
     if (!editId) return;
     const line = cart.find((item) => item.lineId === editId);
     if (!line) return;
-    const timbang = isProdukTimbang(line.nama);
-    const qty = timbang ? parseQtyInput(editQty) : Number(digitsOnly(editQty));
+    const original = produk.find((p) => p.id === line.produkId);
+    const fraction = allowsFractionQty(original || line);
+    const qty = fraction ? parseQtyInput(editQty) : Number(digitsOnly(editQty));
     const harga = Number(digitsOnly(editHarga)) || 0;
     if (!Number.isFinite(qty) || qty <= 0 || harga <= 0) return;
-    const original = produk.find((p) => p.id === line.produkId);
     setLineQty(editId, qty, {
       hargaJual: harga,
       hargaDisesuaikan: !original || original.hargaJual !== harga,
@@ -476,8 +481,9 @@ export default function PosPage() {
           ) : (
             <div className="space-y-2">
               {cart.map((item) => {
-                const timbang = isProdukTimbang(item.nama);
                 const product = produk.find((p) => p.id === item.produkId);
+                const timbang = isProdukTimbang(item.nama);
+                const fraction = allowsFractionQty(product || item);
                 const sisaStok = product ? availableStok(product) : 0;
                 return (
                 <div key={item.lineId} className="rounded-xl border border-border p-3 bg-background/50 space-y-2">
@@ -522,7 +528,7 @@ export default function PosPage() {
                       </button>
                     </div>
                   </div>
-                  {timbang && (
+                  {fraction && (
                     <div className="flex flex-wrap gap-1.5">
                       {TELUR_PRESETS.map((preset) => (
                         <button
@@ -558,12 +564,12 @@ export default function PosPage() {
                     onClick={() => (editId === item.lineId ? setEditId(null) : openEdit(item))}
                     className="text-xs font-semibold text-primary hover:underline"
                   >
-                    {editId === item.lineId ? "Tutup ubah jumlah / harga" : timbang ? "Ketik berat / harga timbangan" : "Ubah jumlah / harga"}
+                    {editId === item.lineId ? "Tutup ubah jumlah / harga" : fraction ? "Ketik berat / harga timbangan" : "Ubah jumlah / harga"}
                   </button>
                   {editId === item.lineId && (
                     <div className="rounded-xl bg-muted/70 p-3 space-y-2">
                       <p className="text-[11px] text-muted-foreground">
-                        {timbang
+                        {fraction
                           ? "Isi berat (0,7 / 1/4 / 1/3 / 1/2) atau ketik total hasil timbangan — stok potong sesuai kg."
                           : "Ubah jumlah atau harga satuan jika perlu."}
                       </p>
@@ -572,17 +578,17 @@ export default function PosPage() {
                           <label className="text-[11px] font-medium">Jumlah{item.satuan ? ` (${item.satuan})` : ""}</label>
                           <input
                             type="text"
-                            inputMode={timbang ? "decimal" : "numeric"}
+                            inputMode={fraction ? "decimal" : "numeric"}
                             value={editQty}
                             onChange={(e) => {
-                              const qRaw = timbang ? sanitizeQtyInput(e.target.value) : digitsOnly(e.target.value);
+                              const qRaw = fraction ? sanitizeQtyInput(e.target.value) : digitsOnly(e.target.value);
                               setEditQty(qRaw);
-                              const q = timbang ? parseQtyInput(qRaw) : Number(digitsOnly(qRaw));
+                              const q = fraction ? parseQtyInput(qRaw) : Number(digitsOnly(qRaw));
                               const h = Number(digitsOnly(editHarga)) || 0;
                               setEditTotal(Number.isFinite(q) && q > 0 && h ? String(lineTotal(q, h)) : "");
                             }}
                             className="input-field py-2 text-sm font-mono"
-                            placeholder={timbang ? "0,7 atau 1/4" : "1"}
+                            placeholder={fraction ? "0,7 atau 1/4" : "1"}
                           />
                         </div>
                         <div>
@@ -594,7 +600,7 @@ export default function PosPage() {
                             onChange={(e) => {
                               const h = digitsOnly(e.target.value);
                               setEditHarga(h);
-                              const q = timbang ? parseQtyInput(editQty) : Number(digitsOnly(editQty));
+                              const q = fraction ? parseQtyInput(editQty) : Number(digitsOnly(editQty));
                               setEditTotal(Number.isFinite(q) && q > 0 && h ? String(lineTotal(q, Number(h))) : "");
                             }}
                             className="input-field py-2 text-sm font-mono"
@@ -611,15 +617,15 @@ export default function PosPage() {
                               setEditTotal(t);
                               const original = produk.find((p) => p.id === item.produkId);
                               const hargaAcuan = original?.hargaJual || Number(digitsOnly(editHarga)) || 0;
-                              if (timbang && t && hargaAcuan) {
+                              if (fraction && t && hargaAcuan) {
                                 const q = qtyFromTimbang(Number(t), hargaAcuan);
                                 if (Number.isFinite(q) && q > 0) {
                                   setEditQty(formatQty(q));
                                   setEditHarga(String(hargaAcuan));
                                 }
                               } else {
-                                const q = timbang ? parseQtyInput(editQty) : Number(digitsOnly(editQty)) || 1;
-                                setEditQty(timbang ? formatQty(q) : String(q));
+                                const q = fraction ? parseQtyInput(editQty) : Number(digitsOnly(editQty)) || 1;
+                                setEditQty(fraction ? formatQty(q) : String(q));
                                 setEditHarga(t && q ? String(Math.round(Number(t) / q)) : "");
                               }
                             }}

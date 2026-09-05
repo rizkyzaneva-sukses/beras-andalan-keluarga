@@ -118,7 +118,7 @@ export default function PanduanPage() {
           </Callout>
           <ol className="space-y-3 mt-2">
             <Step n={1}>
-              Siapkan produk di menu <Link href="/produk" className="text-primary font-semibold underline">Produk</Link> — pilih tipe: <strong>Karungan</strong> (karung utuh), <strong>Eceran</strong> (per kg dari karung), atau <strong>Gabungan</strong> (resep multi-produk).
+              Siapkan produk di menu <Link href="/produk" className="text-primary font-semibold underline">Produk</Link> — pilih tipe: <strong>Karungan</strong> (karung utuh), <strong>Eceran</strong> (per kg dari karung), atau <strong>Gabungan</strong> (campuran karung, dijual per kg).
             </Step>
             <Step n={2}>
               Cetak QR di menu <Link href="/barcode" className="text-primary font-semibold underline">Barcode</Link>, potong, tempel ke karung/etalase.
@@ -217,11 +217,11 @@ export default function PanduanPage() {
               </ul>
             </div>
             <div>
-              <p className="font-semibold text-foreground text-sm mb-1.5">🟣 Gabungan — Bundling/resep multi-produk</p>
+              <p className="font-semibold text-foreground text-sm mb-1.5">🟣 Gabungan — Campuran beras (oplosan)</p>
               <ul className="space-y-1.5 text-sm text-muted-foreground list-disc pl-5">
-                <li>Buat resep dari beberapa produk sumber + jumlah per batch.</li>
-                <li>Stok gabungan = komponen terkecil ÷ jumlah yang dibutuhkan (hitung otomatis).</li>
-                <li>Cocok untuk paket bundling atau campuran khusus.</li>
+                <li>Resep dari produk <strong>karung</strong>, jumlahnya kelipatan <strong>½ karung</strong> atau 1 karung (0,5 / 1 / 1,5 / 2 …).</li>
+                <li>HPP per kg = total modal resep ÷ total kg. Contoh: A 1 + B 1 + C ½ karung, masing-masing Rp 100.000 / 25 kg → 62,5 kg, modal Rp 250.000, HPP Rp 4.000/kg.</li>
+                <li>Stok gabungan tampil dalam <strong>kg</strong>. Saat terjual, stok karung komponen terpotong proporsional.</li>
               </ul>
             </div>
           </div>
@@ -460,7 +460,7 @@ export default function PanduanPage() {
             <div>
               <p className="font-semibold text-foreground">Beda Karungan, Eceran, dan Gabungan?</p>
               <p className="text-muted-foreground mt-1">
-                <strong>Karungan</strong> = stok dalam satuan karung (mis. 10 karung). <strong>Eceran</strong> = stok dalam kg/pcs, sumbernya dari karung (buka 1 karung → +25kg eceran). <strong>Gabungan</strong> = resep bundling dari beberapa produk sumber, stok dihitung dari komponen terbatas.
+                <strong>Karungan</strong> = stok dalam satuan karung (mis. 10 karung). <strong>Eceran</strong> = stok dalam kg/pcs, sumbernya dari karung (buka 1 karung → +25kg eceran). <strong>Gabungan</strong> = campuran beberapa karung (kelipatan ½), dijual per kg, HPP = modal resep ÷ total kg.
               </p>
             </div>
             <div>

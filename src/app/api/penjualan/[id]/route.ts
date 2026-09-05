@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/session";
 import { diffFields, writeAudit } from "@/lib/audit";
-import { isProdukTimbang, isValidQty, lineTotal, toQty } from "@/lib/qty";
+import { allowsFractionQty, isValidQty, lineTotal, toQty } from "@/lib/qty";
 import {
   applyStokDeltas,
   expandStokDelta,
@@ -22,9 +22,9 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
 
   const { produkId, qty: rawQty, hargaJual, total, metodeBayar, hargaDisesuaikan } = await request.json();
   const nextProdukId = produkId || oldRecord.produkId;
-  const produkCek = await prisma.produk.findUnique({ where: { id: nextProdukId }, select: { nama: true } });
+  const produkCek = await prisma.produk.findUnique({ where: { id: nextProdukId }, select: { nama: true, tipe: true } });
   const qty = toQty(rawQty);
-  const allowFraction = Boolean(produkCek && isProdukTimbang(produkCek.nama));
+  const allowFraction = Boolean(produkCek && allowsFractionQty(produkCek));
   if (
     !isValidQty(qty, { allowFraction }) ||
     !Number.isInteger(hargaJual) ||
