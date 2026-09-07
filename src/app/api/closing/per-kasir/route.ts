@@ -49,7 +49,7 @@ export async function GET(request: NextRequest) {
         transferTotal: transfer,
         qrisTotal: qris,
         hutangTotal: hutang,
-        total: cash + transfer + qris,
+        total: cash + transfer + qris + hutang,
         transaksi: userSales.length,
         qty: userSales.reduce((s, p) => s + Number(p.qty), 0),
       };

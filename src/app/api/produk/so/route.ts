@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/session";
 import { writeAudit } from "@/lib/audit";
-import { isProdukTimbang, isValidStokCount, toQty } from "@/lib/qty";
+import { allowsFractionQty, isValidStokCount, toQty } from "@/lib/qty";
 
 type SoItem = {
   produkId?: string;
@@ -63,7 +63,7 @@ export async function POST(request: NextRequest) {
       continue;
     }
     const stokFisik = toQty(item.stokFisik);
-    if (!isValidStokCount(stokFisik, { allowFraction: isProdukTimbang(produk.nama) })) {
+    if (!isValidStokCount(stokFisik, { allowFraction: allowsFractionQty(produk) })) {
       skipped.push({ nama: produk.nama, alasan: "Stok fisik tidak valid" });
       continue;
     }

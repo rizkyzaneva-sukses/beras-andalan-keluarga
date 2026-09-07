@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState, useCallback } from "react";
 import { Html5Qrcode } from "html5-qrcode";
+import { Barcode, Plus, ScanLine } from "lucide-react";
 import { digitsOnly, formatRibuan, formatRupiah } from "@/lib/money";
 import {
   TELUR_PRESETS,
@@ -9,13 +10,13 @@ import {
   availableStok,
   formatQty,
   hasEnoughStock,
-  isProdukTimbang,
   lineTotal,
   parseQtyInput,
   qtyFromTimbang,
   sanitizeQtyInput,
   toQty,
 } from "@/lib/qty";
+import { todayWib } from "@/lib/date";
 
 interface Produk {
   id: string;
@@ -267,7 +268,8 @@ export default function PosPage() {
   const changeQty = (lineId: string, delta: number) => {
     const line = cart.find((item) => item.lineId === lineId);
     if (!line) return;
-    const step = isProdukTimbang(line.nama) ? (delta > 0 ? 0.25 : -0.25) : delta;
+    const product = produk.find((p) => p.id === line.produkId);
+    const step = allowsFractionQty(product || line) ? (delta > 0 ? 0.25 : -0.25) : delta;
     setLineQty(lineId, toQty(line.qty + step));
   };
 
@@ -313,8 +315,7 @@ export default function PosPage() {
     setPaying(true);
     setPayError("");
     try {
-      const now = new Date();
-      const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+      const today = todayWib();
       const res = await fetch("/api/penjualan/checkout", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -361,7 +362,7 @@ export default function PosPage() {
     : namaSuggest;
 
   return (
-    <div className="page-wrap space-y-4 lg:space-y-0 lg:grid lg:grid-cols-5 lg:gap-6 lg:items-start">
+    <div className="page-wrap space-y-4 lg:space-y-0 lg:grid lg:grid-cols-5 lg:gap-6 lg:items-start pb-20 lg:pb-0">
       {successMsg && (
         <div className="lg:col-span-5 rounded-xl bg-primary-soft border border-primary/20 text-primary px-4 py-3 text-center font-semibold">
           {successMsg}
@@ -374,11 +375,9 @@ export default function PosPage() {
       )}
 
       <div className="lg:col-span-3 space-y-4">
-        <div className="flex items-end justify-between gap-3">
-          <div>
-            <h1 className="text-xl sm:text-2xl font-bold tracking-tight">POS Kasir</h1>
-            <p className="text-sm text-muted-foreground mt-0.5">Scan barcode atau pilih produk, lalu bayar</p>
-          </div>
+        <div className="hidden md:block">
+          <h1 className="text-xl sm:text-2xl font-bold tracking-tight">POS Kasir</h1>
+          <p className="text-sm text-muted-foreground mt-0.5">Scan barcode atau pilih produk, lalu bayar</p>
         </div>
 
         <div className="flex flex-col sm:flex-row gap-2">
@@ -393,10 +392,11 @@ export default function PosPage() {
                 setShowScanner(true);
               }
             }}
-            className={`flex-1 py-3.5 rounded-xl font-semibold shadow-sm transition-colors ${
+            className={`flex-1 min-h-12 py-3.5 rounded-xl font-semibold shadow-sm transition-colors inline-flex items-center justify-center gap-2 ${
               showScanner ? "bg-danger text-white" : "btn-primary"
             }`}
           >
+            {showScanner ? <ScanLine className="w-5 h-5" /> : <Barcode className="w-5 h-5" />}
             {showScanner ? "Tutup Scanner" : "Scan Barcode"}
           </button>
 
@@ -414,9 +414,10 @@ export default function PosPage() {
                   setShowScanner(false);
                 }
               }}
-              className="w-full py-3.5 rounded-xl font-semibold border border-border bg-surface text-foreground shadow-sm hover:bg-muted transition-colors"
+              className="w-full min-h-12 py-3.5 rounded-xl font-semibold border border-border bg-surface text-foreground shadow-sm hover:bg-muted transition-colors inline-flex items-center justify-center gap-2"
             >
-              + Pilih Produk
+              <Plus className="w-5 h-5" />
+              Pilih Produk
             </button>
             {showDropdown && (
               <div className="absolute z-20 mt-1.5 w-full card-surface overflow-hidden shadow-lg">
@@ -482,7 +483,6 @@ export default function PosPage() {
             <div className="space-y-2">
               {cart.map((item) => {
                 const product = produk.find((p) => p.id === item.produkId);
-                const timbang = isProdukTimbang(item.nama);
                 const fraction = allowsFractionQty(product || item);
                 const sisaStok = product ? availableStok(product) : 0;
                 return (
@@ -501,7 +501,7 @@ export default function PosPage() {
                     <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
                       <button
                         onClick={() => changeQty(item.lineId, -1)}
-                        className="w-10 h-10 rounded-full bg-muted font-bold text-lg flex items-center justify-center active:scale-95 transition-transform"
+                        className="w-11 h-11 rounded-full bg-muted font-bold text-lg flex items-center justify-center active:scale-95 transition-transform"
                         aria-label="Kurangi"
                       >
                         −
@@ -509,7 +509,7 @@ export default function PosPage() {
                       <span className="min-w-[2.5rem] text-center font-bold tabular-nums">{formatQty(item.qty)}</span>
                       <button
                         onClick={() => changeQty(item.lineId, 1)}
-                        className="w-10 h-10 rounded-full bg-primary text-white font-bold text-lg flex items-center justify-center active:scale-95 transition-transform"
+                        className="w-11 h-11 rounded-full bg-primary text-white font-bold text-lg flex items-center justify-center active:scale-95 transition-transform"
                         aria-label="Tambah"
                       >
                         +
@@ -521,7 +521,7 @@ export default function PosPage() {
                       </div>
                       <button
                         onClick={() => removeItem(item.lineId)}
-                        className="w-9 h-9 rounded-full bg-danger-soft text-danger font-bold flex items-center justify-center shrink-0"
+                        className="w-11 h-11 rounded-full bg-danger-soft text-danger font-bold flex items-center justify-center shrink-0"
                         aria-label="Hapus"
                       >
                         ×
@@ -646,7 +646,7 @@ export default function PosPage() {
         </div>
       </div>
 
-      <div className="lg:col-span-2 lg:sticky lg:top-24 space-y-3">
+      <div className="lg:col-span-2 lg:sticky lg:top-24 space-y-3" id="pos-checkout">
         <div className="card-surface p-4 space-y-4">
           <div className="flex justify-between items-center pb-3 border-b border-border">
             <span className="text-muted-foreground font-medium">Total bayar</span>
@@ -733,11 +733,35 @@ export default function PosPage() {
             </div>
           )}
 
-          <button onClick={checkout} disabled={!canBayar} className="btn-primary w-full py-4 text-lg">
+          <button onClick={checkout} disabled={!canBayar} className="btn-primary w-full py-4 text-lg hidden lg:block">
             {paying ? "Memproses..." : metodeBayar === "HUTANG" ? "CATAT HUTANG" : "BAYAR"}
           </button>
         </div>
       </div>
+
+      {cart.length > 0 && (
+        <div
+          className="lg:hidden fixed inset-x-0 z-30 px-3"
+          style={{ bottom: "calc(4.35rem + var(--safe-bottom))" }}
+        >
+          <button
+            onClick={() => {
+              if (canBayar) {
+                checkout();
+                return;
+              }
+              document.getElementById("pos-checkout")?.scrollIntoView({ behavior: "smooth", block: "end" });
+            }}
+            disabled={paying}
+            className="btn-primary w-full py-3.5 shadow-[0_8px_24px_rgb(15_31_20/0.18)] flex items-center justify-between px-4 rounded-2xl"
+          >
+            <span className="font-semibold">
+              {paying ? "Memproses..." : canBayar ? (metodeBayar === "HUTANG" ? "Catat hutang" : "Bayar sekarang") : "Lanjut bayar"}
+            </span>
+            <span className="font-mono font-bold">{formatRupiah(total)}</span>
+          </button>
+        </div>
+      )}
     </div>
   );
 }

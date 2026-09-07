@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useRef } from "react";
-import { formatRupiah } from "@/lib/money";
+import { AlertTriangle, FlaskConical, Store, Trophy } from "lucide-react";
 
 interface SettingsData {
   namaToko: string;
@@ -131,6 +131,7 @@ export default function PengaturanPage() {
   const [resetConfirmText, setResetConfirmText] = useState("");
   const [resetting, setResetting] = useState(false);
   const [resetMessage, setResetMessage] = useState("");
+  const [seeding, setSeeding] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -207,6 +208,21 @@ export default function PengaturanPage() {
     }
   };
 
+  const handleSeedDummy = async () => {
+    if (!confirm("Buat data dummy? Ini akan menambah transaksi contoh untuk testing.")) return;
+    setSeeding(true);
+    try {
+      const res = await fetch("/api/seed-dummy", { method: "POST" });
+      const data = await res.json();
+      if (data.success) alert(data.message);
+      else alert("Gagal: " + data.error);
+    } catch {
+      alert("Gagal menghubungi server.");
+    } finally {
+      setSeeding(false);
+    }
+  };
+
   const handleExecuteReset = async () => {
     if (resetConfirmText.trim().toUpperCase() !== "RESET") {
       alert("Ketik kata 'RESET' dengan benar untuk konfirmasi.");
@@ -252,35 +268,35 @@ export default function PengaturanPage() {
         <button
           type="button"
           onClick={() => setTab("identitas")}
-          className={`px-4 py-2.5 text-sm font-semibold whitespace-nowrap transition-colors border-b-2 -mb-px ${
+          className={`px-4 py-2.5 text-sm font-semibold whitespace-nowrap transition-colors border-b-2 -mb-px inline-flex items-center gap-1.5 min-h-11 ${
             tab === "identitas"
               ? "border-primary text-primary"
               : "border-transparent text-muted-foreground hover:text-foreground"
           }`}
         >
-          🏪 Identitas & Logo Toko
+          <Store className="w-4 h-4" /> Identitas Toko
         </button>
         <button
           type="button"
           onClick={() => setTab("reset")}
-          className={`px-4 py-2.5 text-sm font-semibold whitespace-nowrap transition-colors border-b-2 -mb-px ${
+          className={`px-4 py-2.5 text-sm font-semibold whitespace-nowrap transition-colors border-b-2 -mb-px inline-flex items-center gap-1.5 min-h-11 ${
             tab === "reset"
               ? "border-danger text-danger"
               : "border-transparent text-muted-foreground hover:text-foreground"
           }`}
         >
-          ⚠️ Reset Data (Mulai 0)
+          <AlertTriangle className="w-4 h-4" /> Reset Data
         </button>
         <button
           type="button"
           onClick={() => setTab("history")}
-          className={`px-4 py-2.5 text-sm font-semibold whitespace-nowrap transition-colors border-b-2 -mb-px ${
+          className={`px-4 py-2.5 text-sm font-semibold whitespace-nowrap transition-colors border-b-2 -mb-px inline-flex items-center gap-1.5 min-h-11 ${
             tab === "history"
               ? "border-primary text-primary"
               : "border-transparent text-muted-foreground hover:text-foreground"
           }`}
         >
-          📜 Riwayat Masalah Selesai
+          <Trophy className="w-4 h-4" /> Riwayat Masalah
         </button>
       </div>
 
@@ -542,9 +558,27 @@ export default function PengaturanPage() {
       {/* TAB 2: RESET DATA */}
       {tab === "reset" && (
         <div className="space-y-4">
+          <div className="card-surface p-4 sm:p-5 space-y-3 border-amber-200 bg-amber-50/40">
+            <div className="flex items-center gap-2 text-amber-900 font-bold">
+              <FlaskConical className="w-5 h-5" />
+              <h2>Data dummy (testing)</h2>
+            </div>
+            <p className="text-xs sm:text-sm text-muted-foreground leading-relaxed">
+              Tambah transaksi contoh untuk uji coba tampilan dashboard dan closing. Tidak menghapus data yang sudah ada.
+            </p>
+            <button
+              type="button"
+              onClick={handleSeedDummy}
+              disabled={seeding}
+              className="w-full min-h-11 py-3 rounded-xl font-semibold text-sm border border-amber-400 bg-amber-500 text-white hover:bg-amber-600 disabled:opacity-50"
+            >
+              {seeding ? "Membuat..." : "Buat Data Dummy"}
+            </button>
+          </div>
+
           <div className="rounded-xl bg-danger-soft/60 border border-danger/25 p-4 sm:p-5 space-y-2">
             <div className="flex items-center gap-2 text-danger font-bold text-base">
-              <span>⚠️</span>
+              <AlertTriangle className="w-5 h-5" />
               <h2>Zona Bahaya: Reset Database</h2>
             </div>
             <p className="text-xs sm:text-sm text-foreground/80 leading-relaxed">
@@ -622,7 +656,7 @@ export default function PengaturanPage() {
             <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in">
               <div className="card-surface max-w-md w-full p-5 sm:p-6 space-y-4 shadow-xl border-danger/40">
                 <div className="flex items-center gap-2.5 text-danger font-bold text-lg">
-                  <span className="text-2xl">⚠️</span>
+                  <AlertTriangle className="w-6 h-6" />
                   <h3>Konfirmasi Reset Data</h3>
                 </div>
 
@@ -681,7 +715,7 @@ export default function PengaturanPage() {
         <div className="space-y-5">
           <div className="card-surface p-4 sm:p-5 bg-gradient-to-r from-primary-soft/40 to-surface border-primary/20 space-y-1.5">
             <div className="flex items-center gap-2">
-              <span className="text-xl">🏆</span>
+              <Trophy className="w-5 h-5 text-primary" />
               <h2 className="text-base sm:text-lg font-bold text-foreground">
                 Riwayat & Solusi Masalah Toko Beras
               </h2>

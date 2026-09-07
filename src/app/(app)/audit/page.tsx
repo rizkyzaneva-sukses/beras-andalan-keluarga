@@ -209,7 +209,7 @@ export default function AuditPage() {
   return (
     <div className="page-wrap space-y-4">
       <div>
-        <h2 className="text-lg font-bold">Audit Trail</h2>
+        <h1 className="text-[1.35rem] font-bold tracking-tight leading-tight">Audit Trail</h1>
         <p className="text-sm text-muted-foreground mt-0.5">Semua aktivitas toko, termasuk penjualan dan perubahan data</p>
       </div>
 
@@ -229,7 +229,7 @@ export default function AuditPage() {
               key={f.label}
               type="button"
               onClick={() => changeFilter(f.entity, f.action)}
-              className={`px-3 py-2 rounded-xl text-[12px] font-semibold min-h-[36px] ${
+              className={`px-3 py-2 rounded-xl text-[12px] font-semibold min-h-11 ${
                 active ? "bg-primary text-white" : "bg-surface border border-border text-muted-foreground hover:bg-muted"
               }`}
             >

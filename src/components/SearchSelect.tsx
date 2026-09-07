@@ -135,7 +135,7 @@ export function SearchSelect({
             setOpen(true);
           }}
           onKeyDown={handleKeyDown}
-          className="w-full px-3 py-2.5 pr-16 border border-border rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary disabled:opacity-50"
+          className="w-full min-h-11 px-3 py-2.5 pr-16 border border-border rounded-xl bg-surface focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary disabled:opacity-50"
         />
         {/* Validasi HTML harus ikut `value` asli, bukan teks pencarian. */}
         {required && (
@@ -181,8 +181,8 @@ export function SearchSelect({
       </div>
 
       {open && !disabled && (
-        <div className="absolute z-30 mt-1.5 w-full bg-white border border-border rounded-xl overflow-hidden shadow-lg">
-          <div ref={listRef} id={listId} role="listbox" className="max-h-52 overflow-y-auto">
+        <div className="absolute z-30 mt-1.5 w-full bg-surface border border-border rounded-xl overflow-hidden shadow-lg">
+          <div ref={listRef} id={listId} role="listbox" className="max-h-56 overflow-y-auto">
             {filtered.length === 0 ? (
               <p className="px-4 py-3 text-sm text-muted-foreground text-center">{emptyText}</p>
             ) : (
@@ -192,7 +192,7 @@ export function SearchSelect({
                   type="button"
                   onMouseEnter={() => setHighlight(i)}
                   onClick={() => pick(o)}
-                  className={`w-full text-left px-4 py-3 border-b border-border last:border-0 transition-colors ${
+                  className={`w-full text-left px-4 py-3.5 min-h-12 border-b border-border last:border-0 transition-colors ${
                     i === highlight ? "bg-primary-soft/60" : ""
                   } ${o.value === value ? "font-semibold" : ""}`}
                 >

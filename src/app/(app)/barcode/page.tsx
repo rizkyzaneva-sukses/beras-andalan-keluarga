@@ -53,14 +53,17 @@ export default function BarcodePage() {
       `}</style>
 
       <div className="max-w-4xl mx-auto space-y-3">
-        <div className="no-print flex items-center justify-between flex-wrap gap-2">
-          <h2 className="text-lg font-bold">Cetak Barcode</h2>
+        <div className="no-print flex items-start justify-between flex-wrap gap-3">
+          <div>
+            <h1 className="text-[1.35rem] font-bold tracking-tight leading-tight">Cetak Barcode</h1>
+            <p className="text-sm text-muted-foreground mt-0.5">Tempel di karung atau etalase, lalu scan di POS</p>
+          </div>
           <div className="flex gap-2">
-            <div className="flex bg-muted rounded-lg p-0.5">
-              <button onClick={() => setFormat("QR")} className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${format === "QR" ? "bg-white text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}>QR Code</button>
-              <button onClick={() => setFormat("CODE128")} className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${format === "CODE128" ? "bg-white text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}>CODE128</button>
+            <div className="flex bg-muted rounded-xl p-1">
+              <button onClick={() => setFormat("QR")} className={`min-h-10 px-3 text-xs font-semibold rounded-lg transition-colors ${format === "QR" ? "bg-surface text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}>QR Code</button>
+              <button onClick={() => setFormat("CODE128")} className={`min-h-10 px-3 text-xs font-semibold rounded-lg transition-colors ${format === "CODE128" ? "bg-surface text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}>CODE128</button>
             </div>
-            <button onClick={() => window.print()} className="bg-primary text-white px-4 py-2.5 rounded-lg text-sm font-medium hover:bg-primary-hover active:bg-primary-hover/80 transition-colors shadow-sm">Cetak</button>
+            <button onClick={() => window.print()} className="btn-primary px-4 text-sm">Cetak</button>
           </div>
         </div>
 

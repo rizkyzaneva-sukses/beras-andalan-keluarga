@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/session";
 import { writeAudit } from "@/lib/audit";
-import { hasEnoughStock, isProdukTimbang, isValidQty, lineTotal, toQty } from "@/lib/qty";
+import { allowsFractionQty, hasEnoughStock, isValidQty, lineTotal, toQty } from "@/lib/qty";
 
 export async function GET(request: NextRequest) {
   const session = await getSession();
@@ -62,7 +62,7 @@ export async function POST(request: NextRequest) {
   }
   const produkCek = await prisma.produk.findUnique({ where: { id: produkId } });
   const qty = toQty(rawQty);
-  const allowFraction = Boolean(produkCek && isProdukTimbang(produkCek.nama));
+  const allowFraction = Boolean(produkCek && allowsFractionQty(produkCek));
   if (
     !produkCek ||
     !isValidQty(qty, { allowFraction }) ||

@@ -8,14 +8,22 @@ export const TELUR_PRESETS = [
   { label: "1", qty: 1 },
 ] as const;
 
+const DECIMAL_SATUAN = new Set(["kg", "liter", "l", "lt", "gram", "gr", "g"]);
+
 export function isProdukTimbang(nama: string) {
   return /telur/i.test(nama || "");
 }
 
-/** Qty boleh pecahan: telur (timbang) atau beras gabungan (dijual per kg). */
-export function allowsFractionQty(product: { nama?: string | null; tipe?: string | null }) {
-  if (product.tipe === "GABUNGAN") return true;
-  return isProdukTimbang(product.nama || "");
+/** Qty boleh pecahan: eceran, gabungan, telur, atau satuan timbang (kg/liter). */
+export function allowsFractionQty(product: {
+  nama?: string | null;
+  tipe?: string | null;
+  satuan?: string | null;
+}) {
+  if (product.tipe === "GABUNGAN" || product.tipe === "ECERAN") return true;
+  if (isProdukTimbang(product.nama || "")) return true;
+  const satuan = (product.satuan || "").trim().toLowerCase();
+  return DECIMAL_SATUAN.has(satuan);
 }
 
 export function roundQty(n: number) {

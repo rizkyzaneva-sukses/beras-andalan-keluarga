@@ -1,4 +1,4 @@
-import { isProdukTimbang, isValidStokCount, parseQtyInput } from "@/lib/qty";
+import { allowsFractionQty, isValidStokCount, parseQtyInput } from "@/lib/qty";
 
 export type TabelBaris = {
   baris: number;
@@ -122,7 +122,7 @@ export function parseTabelProduk(text: string): TabelBaris[] {
 export function validateBarisImport(row: TabelBaris): TabelBaris {
   if (row.error) return row;
   if (!row.satuan) return { ...row, error: "Satuan wajib" };
-  if (!isValidStokCount(row.jumlah, { allowFraction: isProdukTimbang(row.nama) })) {
+  if (!isValidStokCount(row.jumlah, { allowFraction: allowsFractionQty({ nama: row.nama, satuan: row.satuan }) })) {
     return { ...row, error: "Jumlah/stok tidak valid" };
   }
   if (!Number.isInteger(row.hpp) || row.hpp <= 0) return { ...row, error: "HPP tidak valid" };
@@ -132,7 +132,7 @@ export function validateBarisImport(row: TabelBaris): TabelBaris {
 
 export function validateBarisSo(row: TabelBaris): TabelBaris {
   if (row.error) return row;
-  if (!isValidStokCount(row.jumlah, { allowFraction: isProdukTimbang(row.nama) })) {
+  if (!isValidStokCount(row.jumlah, { allowFraction: allowsFractionQty({ nama: row.nama, satuan: row.satuan }) })) {
     return { ...row, error: "Stok fisik tidak valid" };
   }
   return row;

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/session";
 import { writeAudit } from "@/lib/audit";
-import { formatQty, hasEnoughStock, isProdukTimbang, isValidQty, toQty } from "@/lib/qty";
+import { allowsFractionQty, formatQty, hasEnoughStock, isValidQty, toQty } from "@/lib/qty";
 
 export async function POST(request: NextRequest) {
   const session = await getSession();
@@ -32,8 +32,8 @@ export async function POST(request: NextRequest) {
   const fromQty = toQty(rawFromQty);
   const toQtyVal = toQty(rawToQty);
   if (
-    !isValidQty(fromQty, { allowFraction: isProdukTimbang(from.nama) }) ||
-    !isValidQty(toQtyVal, { allowFraction: isProdukTimbang(to.nama) })
+    !isValidQty(fromQty, { allowFraction: allowsFractionQty(from) }) ||
+    !isValidQty(toQtyVal, { allowFraction: allowsFractionQty(to) })
   ) {
     return NextResponse.json({ error: "Jumlah pindah stok tidak valid" }, { status: 400 });
   }

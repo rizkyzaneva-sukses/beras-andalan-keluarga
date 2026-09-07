@@ -3,7 +3,8 @@
 import { useEffect, useState } from "react";
 import { PembelanjaanEntry, KategoriPembelanjaan, Product } from "@/types";
 import { digitsOnly, formatRibuan, formatRupiah } from "@/lib/money";
-import { formatQty, isProdukTimbang, lineTotal, parseQtyInput, sanitizeQtyInput } from "@/lib/qty";
+import { allowsFractionQty, formatQty, lineTotal, parseQtyInput, sanitizeQtyInput } from "@/lib/qty";
+import { startOfMonthWib, startOfWeekMondayWib, todayWib } from "@/lib/date";
 import { SearchSelect } from "@/components/SearchSelect";
 
 type RangeKey = "today" | "week" | "month" | "custom";
@@ -13,22 +14,20 @@ export default function PembelanjaanPage() {
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
-  const [form, setForm] = useState({ tanggal: new Date().toISOString().slice(0, 10), kategori: "RESTOCK" as KategoriPembelanjaan, namaBarang: "", jumlah: "", harga: "", statusBayar: "CASH" as "CASH" | "KREDIT", produkId: "" });
+  const [form, setForm] = useState({ tanggal: todayWib(), kategori: "RESTOCK" as KategoriPembelanjaan, namaBarang: "", jumlah: "", harga: "", statusBayar: "CASH" as "CASH" | "KREDIT", produkId: "" });
   const [produkList, setProdukList] = useState<Product[]>([]);
   const [error, setError] = useState("");
   const [range, setRange] = useState<RangeKey>("today");
-  const [dateFrom, setDateFrom] = useState(new Date().toISOString().slice(0, 10));
-  const [dateTo, setDateTo] = useState(new Date().toISOString().slice(0, 10));
+  const [dateFrom, setDateFrom] = useState(todayWib);
+  const [dateTo, setDateTo] = useState(todayWib);
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const [showSuggest, setShowSuggest] = useState(false);
 
   function getRangeDates() {
-    const today = new Date();
-    const toLocalDate = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-    const todayStr = toLocalDate(today);
+    const todayStr = todayWib();
     if (range === "today") return { from: todayStr, to: todayStr };
-    if (range === "week") { const s = new Date(today); s.setDate(today.getDate() - today.getDay()); return { from: toLocalDate(s), to: todayStr }; }
-    if (range === "month") { const s = new Date(today.getFullYear(), today.getMonth(), 1); return { from: toLocalDate(s), to: todayStr }; }
+    if (range === "week") return { from: startOfWeekMondayWib(todayStr), to: todayStr };
+    if (range === "month") return { from: startOfMonthWib(todayStr), to: todayStr };
     return { from: dateFrom, to: dateTo };
   }
 
@@ -62,7 +61,7 @@ export default function PembelanjaanPage() {
   }
 
   function openAdd() {
-    setEditId(null); setForm({ tanggal: new Date().toISOString().slice(0, 10), kategori: "RESTOCK", namaBarang: "", jumlah: "", harga: "", statusBayar: "CASH", produkId: "" });
+    setEditId(null); setForm({ tanggal: todayWib(), kategori: "RESTOCK", namaBarang: "", jumlah: "", harga: "", statusBayar: "CASH", produkId: "" });
     setShowForm(true); setError(""); setSuggestions([]); setShowSuggest(false);
   }
 
@@ -74,7 +73,7 @@ export default function PembelanjaanPage() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault(); setError("");
     const restock = produkList.find((p) => p.id === form.produkId);
-    const fraction = form.kategori === "RESTOCK" && restock && isProdukTimbang(restock.nama);
+    const fraction = form.kategori === "RESTOCK" && restock && allowsFractionQty(restock);
     const jumlah = fraction ? parseQtyInput(form.jumlah) : Number(digitsOnly(form.jumlah));
     const harga = Number(digitsOnly(form.harga));
     const total = lineTotal(jumlah, harga);
@@ -93,14 +92,17 @@ export default function PembelanjaanPage() {
 
   return (
     <div className="page-wrap space-y-4">
-      <div className="flex justify-between items-center">
-        <h2 className="text-lg font-bold">Pengeluaran</h2>
-        <button onClick={openAdd} className="bg-primary text-white px-4 py-2.5 rounded-lg text-sm font-medium hover:bg-primary-hover active:bg-primary-hover/80 transition-colors shadow-sm">+ Tambah</button>
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <h1 className="text-[1.35rem] font-bold tracking-tight leading-tight">Pengeluaran</h1>
+          <p className="text-sm text-muted-foreground mt-0.5">Restock, operasional, dan belanja lain</p>
+        </div>
+        <button onClick={openAdd} className="btn-primary px-4 text-sm shrink-0">+ Tambah</button>
       </div>
 
-      <div className="flex flex-wrap gap-1.5">
+      <div className="flex gap-1.5 overflow-x-auto scrollbar-none -mx-1 px-1">
         {(Object.keys(rangeLabels) as RangeKey[]).map((r) => (
-          <button key={r} onClick={() => setRange(r)} className={`px-3.5 py-2 rounded-lg text-[13px] font-medium transition-colors ${range === r ? "bg-primary text-white shadow-sm" : "bg-white border border-border text-muted-foreground hover:bg-muted active:bg-border"}`}>{rangeLabels[r]}</button>
+          <button key={r} onClick={() => setRange(r)} className={`shrink-0 min-h-11 px-3.5 py-2 rounded-xl text-[13px] font-semibold transition-colors ${range === r ? "bg-primary text-white shadow-sm" : "bg-surface border border-border text-muted-foreground hover:bg-muted active:bg-border"}`}>{rangeLabels[r]}</button>
         ))}
       </div>
 
@@ -174,7 +176,7 @@ export default function PembelanjaanPage() {
                   }}
                 />
               )}
-              <p className="text-[11px] text-muted-foreground mt-1">Semua produk yang sudah dibuat (beserta barcode) muncul di sini.</p>
+              <p className="text-[11px] text-muted-foreground mt-1">Restock otomatis menambah stok produk. Tidak perlu Isi Stok lagi di menu Produk untuk belanja yang sama.</p>
             </div>
           ) : (
             <div className="relative">
@@ -190,10 +192,10 @@ export default function PembelanjaanPage() {
             </div>
           )}
           <div className="grid grid-cols-2 gap-3">
-            <div><label className="block text-sm font-medium mb-1">Jumlah</label><input type="text" value={form.jumlah} onChange={(e) => { const restock = produkList.find((p) => p.id === form.produkId); const fraction = form.kategori === "RESTOCK" && restock && isProdukTimbang(restock.nama); setForm({ ...form, jumlah: fraction ? sanitizeQtyInput(e.target.value) : digitsOnly(e.target.value) }); }} required className="w-full px-3 py-2.5 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary font-mono" inputMode={form.kategori === "RESTOCK" && produkList.find((p) => p.id === form.produkId && isProdukTimbang(p.nama)) ? "decimal" : "numeric"} placeholder={form.kategori === "RESTOCK" && produkList.find((p) => p.id === form.produkId && isProdukTimbang(p.nama)) ? "0,7 atau 10" : ""} /></div>
+            <div><label className="block text-sm font-medium mb-1">Jumlah</label><input type="text" value={form.jumlah} onChange={(e) => { const restock = produkList.find((p) => p.id === form.produkId); const fraction = form.kategori === "RESTOCK" && restock && allowsFractionQty(restock); setForm({ ...form, jumlah: fraction ? sanitizeQtyInput(e.target.value) : digitsOnly(e.target.value) }); }} required className="w-full px-3 py-2.5 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary font-mono" inputMode={form.kategori === "RESTOCK" && produkList.find((p) => p.id === form.produkId && allowsFractionQty(p)) ? "decimal" : "numeric"} placeholder={form.kategori === "RESTOCK" && produkList.find((p) => p.id === form.produkId && allowsFractionQty(p)) ? "0,7 atau 10" : ""} /></div>
             <div><label className="block text-sm font-medium mb-1">Harga Satuan (Rp)</label><input type="text" value={formatRibuan(digitsOnly(form.harga))} onChange={(e) => setForm({ ...form, harga: digitsOnly(e.target.value) })} required className="w-full px-3 py-2.5 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary font-mono" inputMode="numeric" /></div>
           </div>
-          {form.jumlah && form.harga && (<div className="bg-red-50 rounded-xl p-3 text-center border border-red-200"><span className="text-xs text-red-700">Total: </span><span className="font-mono font-bold text-xl text-red-800">{formatRupiah(lineTotal(produkList.find((p) => p.id === form.produkId && isProdukTimbang(p.nama)) ? parseQtyInput(form.jumlah) : Number(digitsOnly(form.jumlah)), Number(digitsOnly(form.harga))))}</span></div>)}
+          {form.jumlah && form.harga && (<div className="bg-red-50 rounded-xl p-3 text-center border border-red-200"><span className="text-xs text-red-700">Total: </span><span className="font-mono font-bold text-xl text-red-800">{formatRupiah(lineTotal(produkList.find((p) => p.id === form.produkId && allowsFractionQty(p)) ? parseQtyInput(form.jumlah) : Number(digitsOnly(form.jumlah)), Number(digitsOnly(form.harga))))}</span></div>)}
           {error && <p className="text-danger text-sm font-medium">{error}</p>}
           <div className="flex gap-2 pt-1">
             <button type="submit" className="flex-1 bg-primary text-white py-3 rounded-lg font-semibold hover:bg-primary-hover active:bg-primary-hover/80 transition-colors shadow-sm">Simpan</button>
@@ -218,9 +220,9 @@ export default function PembelanjaanPage() {
             </div>
             <div className="flex items-center gap-2 shrink-0">
               <span className="font-mono font-bold text-[15px] text-red-600">{formatRupiah(p.total)}</span>
-              {isToday && <div className="flex flex-col gap-0.5">
-                <button onClick={() => openEdit(p)} className="px-2 py-1 text-xs text-primary font-medium hover:bg-primary/10 rounded transition-colors">Edit</button>
-                <button onClick={() => handleDelete(p.id)} className="px-2 py-1 text-xs text-danger font-medium hover:bg-red-50 rounded transition-colors">Hapus</button>
+              {isToday && <div className="flex flex-col gap-1">
+                <button onClick={() => openEdit(p)} className="min-h-10 px-3 text-xs text-primary font-semibold hover:bg-primary/10 rounded-xl transition-colors">Edit</button>
+                <button onClick={() => handleDelete(p.id)} className="min-h-10 px-3 text-xs text-danger font-semibold hover:bg-danger-soft rounded-xl transition-colors">Hapus</button>
               </div>}
             </div>
           </div>

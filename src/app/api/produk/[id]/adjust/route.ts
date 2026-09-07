@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/session";
 import { writeAudit } from "@/lib/audit";
-import { isProdukTimbang, isValidStokCount, toQty } from "@/lib/qty";
+import { allowsFractionQty, isValidStokCount, toQty } from "@/lib/qty";
 
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const session = await getSession();
@@ -32,7 +32,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   }
 
   const stokFisik = toQty(rawFisik);
-  if (!isValidStokCount(stokFisik, { allowFraction: isProdukTimbang(produk.nama) })) {
+  if (!isValidStokCount(stokFisik, { allowFraction: allowsFractionQty(produk) })) {
     return NextResponse.json({ error: "Stok fisik tidak valid" }, { status: 400 });
   }
 

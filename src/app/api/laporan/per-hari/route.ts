@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/session";
+import { toWibDateString } from "@/lib/date";
 
 export async function GET(request: NextRequest) {
   const session = await getSession();
@@ -30,28 +31,32 @@ export async function GET(request: NextRequest) {
   const dayMap = new Map<string, { pendapatan: number; pengeluaran: number }>();
 
   for (const p of penjualan) {
-    const d = p.tanggal.toISOString().slice(0, 10);
+    const d = toWibDateString(p.tanggal);
+    if (!d) continue;
     const entry = dayMap.get(d) || { pendapatan: 0, pengeluaran: 0 };
     entry.pendapatan += p.total;
     dayMap.set(d, entry);
   }
 
   for (const p of pembayaranPiutang) {
-    const d = p.tanggal.toISOString().slice(0, 10);
+    const d = toWibDateString(p.tanggal);
+    if (!d) continue;
     const entry = dayMap.get(d) || { pendapatan: 0, pengeluaran: 0 };
     entry.pendapatan += p.jumlah;
     dayMap.set(d, entry);
   }
 
   for (const p of pembelanjaan) {
-    const d = p.tanggal.toISOString().slice(0, 10);
+    const d = toWibDateString(p.tanggal);
+    if (!d) continue;
     const entry = dayMap.get(d) || { pendapatan: 0, pengeluaran: 0 };
     entry.pengeluaran += p.total;
     dayMap.set(d, entry);
   }
 
   for (const p of pembayaranUtang) {
-    const d = p.tanggal.toISOString().slice(0, 10);
+    const d = toWibDateString(p.tanggal);
+    if (!d) continue;
     const entry = dayMap.get(d) || { pendapatan: 0, pengeluaran: 0 };
     entry.pengeluaran += p.jumlah;
     dayMap.set(d, entry);

@@ -22,7 +22,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
 
   const { produkId, qty: rawQty, hargaJual, total, metodeBayar, hargaDisesuaikan } = await request.json();
   const nextProdukId = produkId || oldRecord.produkId;
-  const produkCek = await prisma.produk.findUnique({ where: { id: nextProdukId }, select: { nama: true, tipe: true } });
+  const produkCek = await prisma.produk.findUnique({ where: { id: nextProdukId }, select: { nama: true, tipe: true, satuan: true } });
   const qty = toQty(rawQty);
   const allowFraction = Boolean(produkCek && allowsFractionQty(produkCek));
   if (

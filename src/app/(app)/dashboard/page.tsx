@@ -3,6 +3,8 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { LaporanSummary, OmsetPerUser, PenjualanEntry, PembelanjaanEntry } from "@/types";
 import { formatQty } from "@/lib/qty";
+import { startOfMonthWib, startOfWeekMondayWib, todayWib } from "@/lib/date";
+import { PageHeader, Spinner } from "@/components/ui";
 
 type RangeKey = "today" | "week" | "month" | "custom";
 
@@ -91,8 +93,8 @@ function Pagination({
 
 export default function DashboardPage() {
   const [range, setRange] = useState<RangeKey>("today");
-  const [dateFrom, setDateFrom] = useState(new Date().toISOString().slice(0, 10));
-  const [dateTo, setDateTo] = useState(new Date().toISOString().slice(0, 10));
+  const [dateFrom, setDateFrom] = useState(todayWib);
+  const [dateTo, setDateTo] = useState(todayWib);
   const [summary, setSummary] = useState<LaporanSummary | null>(null);
   const [penjualan, setPenjualan] = useState<PenjualanEntry[]>([]);
   const [pembelanjaan, setPembelanjaan] = useState<PembelanjaanEntry[]>([]);
@@ -104,25 +106,15 @@ export default function DashboardPage() {
   const [salePage, setSalePage] = useState(1);
   const [spendPage, setSpendPage] = useState(1);
   const [dayPage, setDayPage] = useState(1);
-  const [resetting, setResetting] = useState(false);
 
   const fetchData = useCallback(async () => {
     // Inline date range calculation to avoid stale closure (Bug #9)
-    const today = new Date();
-    const toLocalDate = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-    const todayStr = toLocalDate(today);
+    const todayStr = todayWib();
     let from: string, to: string;
     if (range === "today") { from = todayStr; to = todayStr; }
-    else if (range === "week") {
-      const start = new Date(today);
-      start.setDate(today.getDate() - today.getDay());
-      from = toLocalDate(start); to = todayStr;
-    } else if (range === "month") {
-      const start = new Date(today.getFullYear(), today.getMonth(), 1);
-      from = toLocalDate(start); to = todayStr;
-    } else {
-      from = dateFrom; to = dateTo;
-    }
+    else if (range === "week") { from = startOfWeekMondayWib(todayStr); to = todayStr; }
+    else if (range === "month") { from = startOfMonthWib(todayStr); to = todayStr; }
+    else { from = dateFrom; to = dateTo; }
 
     setLoading(true);
     const [summaryRes, penjualanRes, pembelanjaanRes, perDayRes, omsetRes] = await Promise.all([
@@ -147,32 +139,6 @@ export default function DashboardPage() {
   useEffect(() => {
     fetchData();
   }, [fetchData]);
-
-  async function handleSeedDummy() {
-    if (!confirm("Buat data dummy? Ini akan menambah transaksi contoh untuk testing.")) return;
-    const res = await fetch("/api/seed-dummy", { method: "POST" });
-    const data = await res.json();
-    if (data.success) {
-      alert(data.message);
-      fetchData();
-    } else {
-      alert("Gagal: " + data.error);
-    }
-  }
-
-  async function handleResetAll() {
-    if (!confirm("HAPUS SEMUA DATA? Semua transaksi, produk, modal, dan user (kecuali admin) akan dihapus permanen. Lanjutkan?")) return;
-    setResetting(true);
-    const res = await fetch("/api/reset", { method: "POST" });
-    const data = await res.json();
-    setResetting(false);
-    if (data.success) {
-      alert(data.message);
-      window.location.reload();
-    } else {
-      alert("Gagal: " + data.error);
-    }
-  }
 
   const filteredPenjualan = useMemo(
     () => (selectedUserId ? penjualan.filter((p) => p.createdBy === selectedUserId) : penjualan),
@@ -199,17 +165,14 @@ export default function DashboardPage() {
 
   return (
     <div className="page-wrap space-y-4">
-      <div>
-        <h2 className="text-xl font-bold tracking-tight">Dashboard</h2>
-        <p className="text-sm text-muted-foreground mt-0.5">Ringkasan kas & laba/rugi</p>
-      </div>
+      <PageHeader title="Dashboard" subtitle="Ringkasan kas, omset kasir, dan laba/rugi" />
 
-      <div className="flex flex-wrap gap-1.5">
+      <div className="flex gap-1.5 overflow-x-auto scrollbar-none -mx-1 px-1">
         {(Object.keys(rangeLabels) as RangeKey[]).map((r) => (
           <button
             key={r}
             onClick={() => setRange(r)}
-            className={`px-3.5 py-2.5 rounded-xl text-[13px] font-semibold transition-colors min-h-[40px] ${
+            className={`shrink-0 px-3.5 py-2.5 rounded-xl text-[13px] font-semibold transition-colors min-h-11 ${
               range === r ? "bg-primary text-white shadow-sm" : "bg-surface border border-border text-muted-foreground hover:bg-muted active:bg-border"
             }`}
           >
@@ -227,10 +190,7 @@ export default function DashboardPage() {
       )}
 
       {loading ? (
-        <div className="text-center py-12">
-          <div className="inline-block w-8 h-8 border-[3px] border-primary border-t-transparent rounded-full animate-spin" />
-          <p className="text-muted-foreground text-sm mt-3">Memuat data...</p>
-        </div>
+        <Spinner label="Memuat data..." />
       ) : summary ? (
         <div className="space-y-3">
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
@@ -313,7 +273,7 @@ export default function DashboardPage() {
                         </div>
                         <p className="font-mono font-bold text-[15px] shrink-0">{formatRupiah(u.total)}</p>
                       </div>
-                      <div className="mt-2 grid grid-cols-4 gap-1.5">
+                      <div className="mt-2 grid grid-cols-2 sm:grid-cols-4 gap-1.5">
                         <div className="rounded-lg bg-muted/80 px-2 py-1.5">
                           <p className="text-[10px] text-muted-foreground font-medium">Tunai</p>
                           <p className="font-mono text-[12px] font-semibold">{u.cashTotal > 0 ? formatRupiah(u.cashTotal) : "—"}</p>
@@ -413,7 +373,7 @@ export default function DashboardPage() {
           {perDay.length > 0 && (
             <div>
               <p className="text-sm font-semibold mb-2">Laba/Rugi Per Hari</p>
-              <div className="bg-white border border-border rounded-xl shadow-sm overflow-hidden">
+              <div className="card-surface overflow-hidden">
                 <div className="grid grid-cols-4 gap-1 px-3 py-2 bg-muted text-[11px] font-semibold text-muted-foreground uppercase tracking-wide">
                   <span>Tanggal</span>
                   <span className="text-right">Masuk</span>
@@ -435,18 +395,6 @@ export default function DashboardPage() {
             </div>
           )}
 
-          <div className="pt-4 border-t border-border space-y-2">
-            <button onClick={handleSeedDummy} className="w-full bg-amber-50 border border-amber-300 text-amber-800 py-2.5 rounded-lg text-sm font-medium hover:bg-amber-100 active:bg-amber-200 transition-colors">
-              Buat Data Dummy (Testing)
-            </button>
-            <button
-              onClick={handleResetAll}
-              disabled={resetting}
-              className="w-full bg-red-50 border border-red-300 text-red-700 py-2.5 rounded-lg text-sm font-medium hover:bg-red-100 active:bg-red-200 disabled:opacity-50 transition-colors"
-            >
-              {resetting ? "Menghapus..." : "Reset Semua Data"}
-            </button>
-          </div>
         </div>
       ) : null}
     </div>

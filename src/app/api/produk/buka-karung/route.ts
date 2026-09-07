@@ -11,7 +11,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
   }
 
-  const { karungId } = await request.json();
+  const { karungId, eceranId } = await request.json();
   if (!karungId) {
     return NextResponse.json({ error: "Pilih produk karung" }, { status: 400 });
   }
@@ -34,12 +34,17 @@ export async function POST(request: NextRequest) {
   }
 
   const isiPerKarung = karung.isiPerKarung ? toQty(karung.isiPerKarung) : 25;
-  const eceran = karung.eceranDariProduk[0]; // first linked eceran
-
-  if (!eceran) {
+  const linked = karung.eceranDariProduk;
+  if (!linked.length) {
     return NextResponse.json({
       error: `Tidak ada produk eceran yang terhubung ke ${karung.nama}. Buat produk eceran dulu.`,
     }, { status: 400 });
+  }
+  const eceran = (typeof eceranId === "string" && eceranId
+    ? linked.find((p) => p.id === eceranId)
+    : linked[0]) || null;
+  if (!eceran) {
+    return NextResponse.json({ error: "Pilih produk eceran tujuan yang tertaut ke karung ini" }, { status: 400 });
   }
 
   // Transaction: -1 karung, +isiPerKarung kg ke eceran

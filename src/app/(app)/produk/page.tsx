@@ -10,7 +10,7 @@ import {
   isKelipatanSetengahKarung,
   langkahKarung,
 } from "@/lib/gabungan";
-import { formatQty, isProdukTimbang, parseQtyInput, sanitizeQtyInput, toQty } from "@/lib/qty";
+import { allowsFractionQty, formatQty, parseQtyInput, sanitizeQtyInput, toQty } from "@/lib/qty";
 import { CONTOH_CSV, parseTabelProduk, validateBarisImport, validateBarisSo } from "@/lib/import-tabel";
 import { SearchSelect } from "@/components/SearchSelect";
 
@@ -39,7 +39,6 @@ export default function ProdukPage() {
   const [stockJumlah, setStockJumlah] = useState("");
   const [stockHarga, setStockHarga] = useState("");
   const [stockCatatan, setStockCatatan] = useState("");
-  const [stockStatus, setStockStatus] = useState<"CASH" | "KREDIT">("CASH");
   const [pindahKe, setPindahKe] = useState("");
   const [pindahJumlahKe, setPindahJumlahKe] = useState("");
   const [showPindahScanner, setShowPindahScanner] = useState(false);
@@ -69,6 +68,7 @@ export default function ProdukPage() {
   const [formSumberId, setFormSumberId] = useState("");
   const [formKomposisi, setFormKomposisi] = useState<{ sumberId: string; qtyPerBatch: string }[]>([]);
   const [bukaKarungId, setBukaKarungId] = useState<string | null>(null);
+  const [bukaKarungEceranId, setBukaKarungEceranId] = useState("");
   const [bukaKarungMsg, setBukaKarungMsg] = useState("");
   const [bukaKarungErr, setBukaKarungErr] = useState("");
   const [bukaKarungSaving, setBukaKarungSaving] = useState(false);
@@ -123,9 +123,8 @@ export default function ProdukPage() {
     setStockMode(mode);
     setStockId(p.id);
     setStockJumlah("");
-    setStockHarga(mode === "isi" ? String(p.hargaBeli) : "");
+    setStockHarga("");
     setStockCatatan("");
-    setStockStatus("CASH");
     setPindahKe("");
     setPindahJumlahKe("");
     setShowPindahScanner(false);
@@ -246,7 +245,7 @@ export default function ProdukPage() {
       const res = await fetch("/api/produk/buka-karung", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ karungId }),
+        body: JSON.stringify({ karungId, eceranId: bukaKarungEceranId || undefined }),
       });
       const json = await res.json();
       if (!res.ok) {
@@ -355,7 +354,7 @@ export default function ProdukPage() {
   async function handleStock() {
     if (!stockId || !stockMode) return;
     setStockError("");
-    const fraction = selected && isProdukTimbang(selected.nama);
+    const fraction = selected && allowsFractionQty(selected);
 
     if (stockMode === "adjust") {
       const fisik = parseQtyInput(stockJumlah);
@@ -402,7 +401,7 @@ export default function ProdukPage() {
     try {
       if (stockMode === "pindah") {
         const tujuan = tujuanList.find((p) => p.id === pindahKe);
-        const toQtyVal = tujuan && isProdukTimbang(tujuan.nama) ? parseQtyInput(pindahJumlahKe) : Number(digitsOnly(pindahJumlahKe));
+        const toQtyVal = tujuan && allowsFractionQty(tujuan) ? parseQtyInput(pindahJumlahKe) : Number(digitsOnly(pindahJumlahKe));
         if (!pindahKe) {
           setStockError("Pilih produk tujuan");
           setStockSaving(false);
@@ -432,7 +431,6 @@ export default function ProdukPage() {
             arah: stockMode === "isi" ? "tambah" : "kurang",
             jumlah,
             harga: harga && harga > 0 ? harga : undefined,
-            statusBayar: stockStatus,
             catatan: stockCatatan || undefined,
           }),
         });
@@ -564,14 +562,61 @@ export default function ProdukPage() {
     reader.readAsText(file);
   }
 
+  function stockValue(p: Product) {
+    return p.tipe === "GABUNGAN" && p.stokGabungan != null ? toQty(p.stokGabungan) : toQty(p.stok);
+  }
+
+  function ProductActions({ p }: { p: Product }) {
+    return (
+      <div className="flex flex-wrap gap-1.5">
+        {p.tipe === "KARUNG" && (
+          <button
+            type="button"
+            onClick={() => {
+              setBukaKarungId(p.id);
+              setBukaKarungEceranId(p.eceranDariProduk?.[0]?.id || "");
+              setBukaKarungErr("");
+              setBukaKarungMsg("");
+            }}
+            className="chip-action bg-blue-50 text-blue-700"
+          >
+            Buka 1
+          </button>
+        )}
+        {p.tipe !== "GABUNGAN" && (
+          <>
+            <button type="button" onClick={() => openStock("adjust", p)} className="chip-action bg-amber-50 text-amber-800">
+              SO
+            </button>
+            <button type="button" onClick={() => openStock("isi", p)} className="chip-action bg-primary-soft text-primary">
+              Isi
+            </button>
+            <button type="button" onClick={() => openStock("kurang", p)} className="chip-action bg-muted text-muted-foreground">
+              Kurangi
+            </button>
+            <button type="button" onClick={() => openStock("pindah", p)} className="chip-action bg-muted text-muted-foreground">
+              Pindah
+            </button>
+          </>
+        )}
+        <button type="button" onClick={() => openEdit(p)} className="chip-action text-primary bg-primary-soft/50">
+          Edit
+        </button>
+        <button type="button" onClick={() => handleDelete(p.id)} className="chip-action text-danger bg-danger-soft">
+          Hapus
+        </button>
+      </div>
+    );
+  }
+
   return (
     <div className="page-wrap space-y-4">
-      <div className="flex justify-between items-start gap-3">
+      <div className="flex flex-col gap-3 sm:flex-row sm:justify-between sm:items-start">
         <div>
           <h2 className="text-xl font-bold tracking-tight">Master Produk</h2>
-          <p className="text-sm text-muted-foreground">Upload banyak, tabel stok, dan Stock Opname (stok diganti, bukan ditambah).</p>
+          <p className="text-sm text-muted-foreground">Upload banyak, kartu stok di HP, dan Stock Opname (stok diganti, bukan ditambah).</p>
         </div>
-        <div className="flex flex-wrap justify-end gap-2 shrink-0">
+        <div className="flex flex-wrap gap-2">
           <button
             type="button"
             onClick={() => {
@@ -1014,23 +1059,23 @@ export default function ProdukPage() {
             </label>
             <input
               type="text"
-              inputMode={isProdukTimbang(selected.nama) ? "decimal" : "numeric"}
+              inputMode={allowsFractionQty(selected) ? "decimal" : "numeric"}
               value={stockJumlah}
               onChange={(e) =>
-                setStockJumlah(isProdukTimbang(selected.nama) ? sanitizeQtyInput(e.target.value) : digitsOnly(e.target.value))
+                setStockJumlah(allowsFractionQty(selected) ? sanitizeQtyInput(e.target.value) : digitsOnly(e.target.value))
               }
               className="w-full px-3 py-2.5 border border-border rounded-lg font-mono"
               placeholder={
                 stockMode === "adjust"
-                  ? isProdukTimbang(selected.nama)
+                  ? allowsFractionQty(selected)
                     ? "Contoh: 0,7"
                     : "Hasil hitung SO"
-                  : isProdukTimbang(selected.nama)
+                  : allowsFractionQty(selected)
                     ? "Contoh: 0,7 atau 10"
                     : "Contoh: 25"
               }
             />
-            {isProdukTimbang(selected.nama) && (
+            {allowsFractionQty(selected) && (
               <p className="text-[11px] text-muted-foreground mt-1">Telur boleh pecahan: 0,7 · 1/4 · 1/3 · 1/2 kg.</p>
             )}
           </div>
@@ -1052,30 +1097,19 @@ export default function ProdukPage() {
           {stockMode === "isi" && (
             <>
               <div>
-                <label className="block text-sm font-medium mb-1">Harga beli satuan (opsional)</label>
+                <label className="block text-sm font-medium mb-1">Harga beli satuan (opsional, untuk HPP)</label>
                 <input
                   type="text"
                   inputMode="numeric"
                   value={formatRibuan(stockHarga)}
                   onChange={(e) => setStockHarga(digitsOnly(e.target.value))}
                   className="w-full px-3 py-2.5 border border-border rounded-lg font-mono"
-                  placeholder="Isi jika ingin dicatat sebagai pengeluaran restock"
+                  placeholder="Hanya untuk rata-rata HPP, bukan pengeluaran"
                 />
-                <p className="text-[11px] text-muted-foreground mt-1">Kosongkan jika belanja sudah dicatat di menu Pengeluaran.</p>
+                <p className="text-[11px] text-muted-foreground mt-1">
+                  Isi stok hanya menambah barang di gudang. Kalau ini belanja supplier, catat di <strong>Pengeluaran → Restock</strong> — stok sudah naik otomatis dari sana, jangan isi stok lagi.
+                </p>
               </div>
-              {stockHarga && Number(stockHarga) > 0 && (
-                <div>
-                  <label className="block text-sm font-medium mb-1">Status bayar restock</label>
-                  <div className="flex gap-2">
-                    <button type="button" onClick={() => setStockStatus("CASH")} className={`flex-1 py-2.5 rounded-lg text-sm font-medium border ${stockStatus === "CASH" ? "bg-green-600 text-white border-green-600" : "border-border text-muted-foreground"}`}>
-                      Cash
-                    </button>
-                    <button type="button" onClick={() => setStockStatus("KREDIT")} className={`flex-1 py-2.5 rounded-lg text-sm font-medium border ${stockStatus === "KREDIT" ? "bg-amber-600 text-white border-amber-600" : "border-border text-muted-foreground"}`}>
-                      Kredit
-                    </button>
-                  </div>
-                </div>
-              )}
             </>
           )}
           {stockMode === "kurang" && (
@@ -1178,11 +1212,11 @@ export default function ProdukPage() {
                 <label className="block text-sm font-medium mb-1">Jumlah ditambahkan ke tujuan</label>
                 <input
                   type="text"
-                  inputMode={pindahTujuanSelected && isProdukTimbang(pindahTujuanSelected.nama) ? "decimal" : "numeric"}
+                  inputMode={pindahTujuanSelected && allowsFractionQty(pindahTujuanSelected) ? "decimal" : "numeric"}
                   value={pindahJumlahKe}
                   onChange={(e) => {
                     setPindahJumlahKe(
-                      pindahTujuanSelected && isProdukTimbang(pindahTujuanSelected.nama)
+                      pindahTujuanSelected && allowsFractionQty(pindahTujuanSelected)
                         ? sanitizeQtyInput(e.target.value)
                         : digitsOnly(e.target.value)
                     );
@@ -1211,162 +1245,221 @@ export default function ProdukPage() {
           <p className="text-muted-foreground text-sm mt-2">Memuat...</p>
         </div>
       ) : produk.length === 0 ? (
-        <div className="text-center py-10 bg-white border border-dashed border-border rounded-xl">
+        <div className="text-center py-10 bg-surface border border-dashed border-border rounded-xl">
           <p className="text-muted-foreground text-sm">Belum ada produk</p>
         </div>
       ) : filtered.length === 0 ? (
-        <div className="text-center py-10 bg-white border border-dashed border-border rounded-xl">
+        <div className="text-center py-10 bg-surface border border-dashed border-border rounded-xl">
           <p className="text-muted-foreground text-sm">Tidak ada produk bernama “{search.trim()}”</p>
         </div>
       ) : (
-        <div className="card-surface overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm min-w-[720px]">
-              <thead>
-                <tr className="bg-muted/70 text-left text-[11px] uppercase tracking-wide text-muted-foreground">
-                  <th className="px-3 py-2.5 font-semibold">Produk</th>
-                  <th className="px-3 py-2.5 font-semibold">Satuan</th>
-                  <th className="px-3 py-2.5 font-semibold text-right">Harga jual</th>
-                  <th className="px-3 py-2.5 font-semibold text-right">Stok sistem</th>
-                  {soMode ? (
-                    <th className="px-3 py-2.5 font-semibold text-right">Stok fisik (jadi)</th>
-                  ) : (
-                    <th className="px-3 py-2.5 font-semibold text-right">Aksi</th>
-                  )}
-                </tr>
-              </thead>
-              <tbody>
-                {filtered.map((p) => {
-                  const stok = toQty(p.stok);
-                  return (
-                    <tr key={p.id} className="border-t border-border hover:bg-muted/40">
-                      <td className="px-3 py-2.5">
-                        <div className="flex items-center gap-1.5 flex-wrap">
-                          <p className="font-semibold text-[13px]">{p.nama}</p>
-                          {p.tipe === "KARUNG" && (
-                            <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-blue-100 text-blue-700">Karung</span>
-                          )}
-                          {p.tipe === "ECERAN" && (
-                            <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-green-100 text-green-700">Ecer</span>
-                          )}
-                          {p.tipe === "GABUNGAN" && (
-                            <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-purple-100 text-purple-700">Gabungan</span>
-                          )}
-                        </div>
-                        <p className="text-[11px] text-muted-foreground">
-                          Beli {formatRupiah(p.hargaBeli)}
-                          {p.tipe === "GABUNGAN" ? "/kg" : ""}
-                        </p>
-                        {p.tipe === "KARUNG" && p.isiPerKarung && (
-                          <p className="text-[11px] text-blue-600">1 karung = {formatQty(p.isiPerKarung)} kg</p>
+        <>
+          <div className="md:hidden space-y-2">
+            {filtered.map((p) => {
+              const stok = stockValue(p);
+              return (
+                <div key={p.id} className="card-surface p-3.5 space-y-2.5">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <p className="font-semibold text-[15px] leading-snug">{p.nama}</p>
+                        {p.tipe === "KARUNG" && (
+                          <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-blue-100 text-blue-700">Karung</span>
                         )}
-                        {p.tipe === "ECERAN" && p.sumberProdukNama && (
-                          <p className="text-[11px] text-green-600">← {p.sumberProdukNama}</p>
+                        {p.tipe === "ECERAN" && (
+                          <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-green-100 text-green-700">Ecer</span>
                         )}
-                        {p.tipe === "GABUNGAN" && p.komposisi && p.komposisi.length > 0 && (
-                          <p
-                            className="text-[11px] text-purple-600 truncate"
-                            title={p.komposisi.map((k) => `${k.sumberNama} ${formatKarungQty(k.qtyPerBatch)} karung`).join(" + ")}
-                          >
-                            {p.komposisi.map((k) => `${k.sumberNama} ${formatKarungQty(k.qtyPerBatch)}`).join(" + ")}
-                            {p.totalKgResep ? ` · ${formatQty(p.totalKgResep)} kg` : ""}
-                          </p>
+                        {p.tipe === "GABUNGAN" && (
+                          <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-purple-100 text-purple-700">Gabungan</span>
                         )}
-                      </td>
-                      <td className="px-3 py-2.5 text-muted-foreground">{p.satuan}</td>
-                      <td className="px-3 py-2.5 text-right font-mono">{formatRupiah(p.hargaJual)}</td>
-                      <td className={`px-3 py-2.5 text-right font-mono font-bold ${(p.tipe === "GABUNGAN" ? toQty(p.stokGabungan ?? 0) : stok) <= 0 ? "text-danger" : (p.tipe === "GABUNGAN" ? toQty(p.stokGabungan ?? 0) : stok) < 10 ? "text-warning" : "text-primary"}`}>
-                        {p.tipe === "GABUNGAN" && p.stokGabungan != null ? (
-                          <span title="Stok dihitung dari komponen resep">{formatQty(p.stokGabungan)}</span>
-                        ) : (
-                          formatQty(p.stok)
-                        )}
-                      </td>
-                      {soMode ? (
-                      <td className="px-3 py-2.5">
-                        <input
-                          type="text"
-                          inputMode={isProdukTimbang(p.nama) ? "decimal" : "numeric"}
-                          value={soFisik[p.id] ?? ""}
-                          onChange={(e) =>
-                            setSoFisik((prev) => ({
-                              ...prev,
-                              [p.id]: isProdukTimbang(p.nama) ? sanitizeQtyInput(e.target.value) : digitsOnly(e.target.value),
-                            }))
-                          }
-                          placeholder={formatQty(p.stok)}
-                          className="w-24 ml-auto block px-2 py-1.5 border border-amber-300 rounded-md font-mono text-right bg-white"
-                        />
-                      </td>
-                      ) : (
-                      <td className="px-3 py-2.5">
-                        <div className="flex flex-wrap justify-end gap-1">
-                          {p.tipe === "KARUNG" && (
-                            <button
-                              type="button"
-                              onClick={() => { setBukaKarungId(p.id); setBukaKarungErr(""); setBukaKarungMsg(""); }}
-                              className="px-2 py-1 rounded-md text-[11px] font-semibold bg-blue-50 text-blue-700"
-                            >Buka 1</button>
-                          )}
-                          {p.tipe !== "GABUNGAN" && (
-                            <>
-                              <button type="button" onClick={() => openStock("adjust", p)} className="px-2 py-1 rounded-md text-[11px] font-semibold bg-amber-50 text-amber-800">
-                                SO
-                              </button>
-                              <button type="button" onClick={() => openStock("isi", p)} className="px-2 py-1 rounded-md text-[11px] font-semibold bg-primary-soft text-primary">
-                                Isi
-                              </button>
-                              <button type="button" onClick={() => openStock("kurang", p)} className="px-2 py-1 rounded-md text-[11px] font-semibold bg-muted text-muted-foreground">
-                                Kurangi
-                              </button>
-                              <button type="button" onClick={() => openStock("pindah", p)} className="px-2 py-1 rounded-md text-[11px] font-semibold bg-muted text-muted-foreground">
-                                Pindah
-                              </button>
-                            </>
-                          )}
-                          <button type="button" onClick={() => openEdit(p)} className="px-2 py-1 rounded-md text-[11px] font-semibold text-primary hover:bg-primary-soft">
-                            Edit
-                          </button>
-                          <button type="button" onClick={() => handleDelete(p.id)} className="px-2 py-1 rounded-md text-[11px] font-semibold text-danger hover:bg-danger-soft">
-                            Hapus
-                          </button>
-                        </div>
-                      </td>
+                      </div>
+                      <p className="text-[11px] text-muted-foreground mt-0.5">
+                        {formatRupiah(p.hargaJual)} / {p.satuan} · beli {formatRupiah(p.hargaBeli)}
+                        {p.tipe === "GABUNGAN" ? "/kg" : ""}
+                      </p>
+                      {p.tipe === "KARUNG" && p.isiPerKarung && (
+                        <p className="text-[11px] text-blue-600">1 karung = {formatQty(p.isiPerKarung)} kg</p>
                       )}
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+                      {p.tipe === "ECERAN" && p.sumberProdukNama && (
+                        <p className="text-[11px] text-green-600">← {p.sumberProdukNama}</p>
+                      )}
+                      {p.tipe === "GABUNGAN" && p.komposisi && p.komposisi.length > 0 && (
+                        <p className="text-[11px] text-purple-600">
+                          {p.komposisi.map((k) => `${k.sumberNama} ${formatKarungQty(k.qtyPerBatch)}`).join(" + ")}
+                          {p.totalKgResep ? ` · ${formatQty(p.totalKgResep)} kg` : ""}
+                        </p>
+                      )}
+                    </div>
+                    <div className="text-right shrink-0">
+                      <p className="text-[10px] uppercase tracking-wide text-muted-foreground font-semibold">Stok</p>
+                      <p className={`font-mono font-bold ${stok <= 0 ? "text-danger" : stok < 10 ? "text-warning" : "text-primary"}`}>
+                        {formatQty(stok)} {p.satuan}
+                      </p>
+                    </div>
+                  </div>
+                  {soMode ? (
+                    <div>
+                      <label className="text-[11px] font-medium">Stok fisik (jadi)</label>
+                      <input
+                        type="text"
+                        inputMode={allowsFractionQty(p) ? "decimal" : "numeric"}
+                        value={soFisik[p.id] ?? ""}
+                        onChange={(e) =>
+                          setSoFisik((prev) => ({
+                            ...prev,
+                            [p.id]: allowsFractionQty(p) ? sanitizeQtyInput(e.target.value) : digitsOnly(e.target.value),
+                          }))
+                        }
+                        placeholder={formatQty(p.stok)}
+                        className="mt-1 w-full px-3 py-2.5 border border-amber-300 rounded-xl font-mono text-right bg-surface min-h-11"
+                      />
+                    </div>
+                  ) : (
+                    <ProductActions p={p} />
+                  )}
+                </div>
+              );
+            })}
           </div>
-        </div>
+
+          <div className="hidden md:block card-surface overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm min-w-[720px]">
+                <thead>
+                  <tr className="bg-muted/70 text-left text-[11px] uppercase tracking-wide text-muted-foreground">
+                    <th className="px-3 py-2.5 font-semibold">Produk</th>
+                    <th className="px-3 py-2.5 font-semibold">Satuan</th>
+                    <th className="px-3 py-2.5 font-semibold text-right">Harga jual</th>
+                    <th className="px-3 py-2.5 font-semibold text-right">Stok sistem</th>
+                    {soMode ? (
+                      <th className="px-3 py-2.5 font-semibold text-right">Stok fisik (jadi)</th>
+                    ) : (
+                      <th className="px-3 py-2.5 font-semibold text-right">Aksi</th>
+                    )}
+                  </tr>
+                </thead>
+                <tbody>
+                  {filtered.map((p) => {
+                    const stok = stockValue(p);
+                    return (
+                      <tr key={p.id} className="border-t border-border hover:bg-muted/40">
+                        <td className="px-3 py-2.5">
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <p className="font-semibold text-[13px]">{p.nama}</p>
+                            {p.tipe === "KARUNG" && (
+                              <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-blue-100 text-blue-700">Karung</span>
+                            )}
+                            {p.tipe === "ECERAN" && (
+                              <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-green-100 text-green-700">Ecer</span>
+                            )}
+                            {p.tipe === "GABUNGAN" && (
+                              <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-purple-100 text-purple-700">Gabungan</span>
+                            )}
+                          </div>
+                          <p className="text-[11px] text-muted-foreground">
+                            Beli {formatRupiah(p.hargaBeli)}
+                            {p.tipe === "GABUNGAN" ? "/kg" : ""}
+                          </p>
+                          {p.tipe === "KARUNG" && p.isiPerKarung && (
+                            <p className="text-[11px] text-blue-600">1 karung = {formatQty(p.isiPerKarung)} kg</p>
+                          )}
+                          {p.tipe === "ECERAN" && p.sumberProdukNama && (
+                            <p className="text-[11px] text-green-600">← {p.sumberProdukNama}</p>
+                          )}
+                          {p.tipe === "GABUNGAN" && p.komposisi && p.komposisi.length > 0 && (
+                            <p
+                              className="text-[11px] text-purple-600 truncate"
+                              title={p.komposisi.map((k) => `${k.sumberNama} ${formatKarungQty(k.qtyPerBatch)} karung`).join(" + ")}
+                            >
+                              {p.komposisi.map((k) => `${k.sumberNama} ${formatKarungQty(k.qtyPerBatch)}`).join(" + ")}
+                              {p.totalKgResep ? ` · ${formatQty(p.totalKgResep)} kg` : ""}
+                            </p>
+                          )}
+                        </td>
+                        <td className="px-3 py-2.5 text-muted-foreground">{p.satuan}</td>
+                        <td className="px-3 py-2.5 text-right font-mono">{formatRupiah(p.hargaJual)}</td>
+                        <td className={`px-3 py-2.5 text-right font-mono font-bold ${stok <= 0 ? "text-danger" : stok < 10 ? "text-warning" : "text-primary"}`}>
+                          {p.tipe === "GABUNGAN" && p.stokGabungan != null ? (
+                            <span title="Stok dihitung dari komponen resep">{formatQty(p.stokGabungan)}</span>
+                          ) : (
+                            formatQty(p.stok)
+                          )}
+                        </td>
+                        {soMode ? (
+                          <td className="px-3 py-2.5">
+                            <input
+                              type="text"
+                              inputMode={allowsFractionQty(p) ? "decimal" : "numeric"}
+                              value={soFisik[p.id] ?? ""}
+                              onChange={(e) =>
+                                setSoFisik((prev) => ({
+                                  ...prev,
+                                  [p.id]: allowsFractionQty(p) ? sanitizeQtyInput(e.target.value) : digitsOnly(e.target.value),
+                                }))
+                              }
+                              placeholder={formatQty(p.stok)}
+                              className="w-24 ml-auto block px-2 py-1.5 border border-amber-300 rounded-md font-mono text-right bg-surface"
+                            />
+                          </td>
+                        ) : (
+                          <td className="px-3 py-2.5">
+                            <div className="flex justify-end">
+                              <ProductActions p={p} />
+                            </div>
+                          </td>
+                        )}
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </>
       )}
 
       {/* Buka Karung confirmation */}
       {bukaKarungId && (() => {
         const karung = active.find((p) => p.id === bukaKarungId);
         if (!karung) return null;
-        const eceranNama = karung.eceranDariProduk?.[0]?.nama || "eceran terkait";
+        const eceranList = karung.eceranDariProduk || [];
+        const tujuan = eceranList.find((e) => e.id === bukaKarungEceranId) || eceranList[0];
         return (
           <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 space-y-3 shadow-sm">
             <h3 className="font-semibold text-[15px] text-blue-950">Buka 1 Karung</h3>
             <p className="text-sm text-blue-900">
-              Buka 1 <strong>{karung.nama}</strong> (stok: {formatQty(karung.stok)} karung) → tambah {karung.isiPerKarung ? formatQty(karung.isiPerKarung) : "25"} kg ke <strong>{eceranNama}</strong>?
+              Buka 1 <strong>{karung.nama}</strong> (stok: {formatQty(karung.stok)} karung) → tambah {karung.isiPerKarung ? formatQty(karung.isiPerKarung) : "25"} kg ke eceran tujuan.
             </p>
+            {eceranList.length === 0 ? (
+              <p className="text-sm text-danger font-medium">Belum ada produk eceran tertaut. Buat produk eceran dulu.</p>
+            ) : eceranList.length === 1 ? (
+              <p className="text-sm text-blue-900">Tujuan: <strong>{tujuan?.nama}</strong></p>
+            ) : (
+              <div>
+                <label className="block text-sm font-medium mb-1 text-blue-950">Pilih eceran tujuan</label>
+                <SearchSelect
+                  value={bukaKarungEceranId || tujuan?.id || ""}
+                  onChange={setBukaKarungEceranId}
+                  allowClear={false}
+                  placeholder="Pilih eceran..."
+                  options={eceranList.map((e) => ({ value: e.id, label: e.nama }))}
+                />
+              </div>
+            )}
             {bukaKarungErr && <p className="text-danger text-sm font-medium">{bukaKarungErr}</p>}
             {bukaKarungMsg && <p className="text-primary text-sm font-medium">{bukaKarungMsg}</p>}
             <div className="flex gap-2">
               <button
                 type="button"
                 onClick={async () => { await handleBukaKarung(bukaKarungId); }}
-                disabled={bukaKarungSaving}
+                disabled={bukaKarungSaving || eceranList.length === 0}
                 className="flex-1 bg-blue-600 text-white py-3 rounded-lg font-semibold disabled:opacity-50"
               >
                 {bukaKarungSaving ? "Membuka..." : "Ya, Buka 1 Karung"}
               </button>
               <button
                 type="button"
-                onClick={() => { setBukaKarungId(null); setBukaKarungMsg(""); setBukaKarungErr(""); }}
+                onClick={() => { setBukaKarungId(null); setBukaKarungEceranId(""); setBukaKarungMsg(""); setBukaKarungErr(""); }}
                 className="px-5 py-3 border border-blue-300 rounded-lg text-blue-900 font-medium bg-white"
               >Batal</button>
             </div>

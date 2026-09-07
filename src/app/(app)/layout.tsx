@@ -3,34 +3,22 @@
 import { useEffect, useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
+import { LogOut } from "lucide-react";
+import { NavIcon } from "@/components/NavIcon";
+import {
+  currentNavItem,
+  flattenNav,
+  groupsForRole,
+  isNavActive,
+  moreItemsForRole,
+  tabItemsForRole,
+  type UserRole,
+} from "@/lib/nav";
 
 interface NavUser {
   username: string;
-  role: "OWNER" | "KASIR";
+  role: UserRole;
 }
-
-type NavItem = {
-  href: string;
-  label: string;
-  short: string;
-  ownerOnly: boolean;
-  primary?: boolean;
-};
-
-const NAV_ITEMS: NavItem[] = [
-  { href: "/pos", label: "POS Kasir", short: "POS", ownerOnly: false, primary: true },
-  { href: "/dashboard", label: "Dashboard", short: "Home", ownerOnly: true, primary: true },
-  { href: "/closing", label: "Closing", short: "Close", ownerOnly: true, primary: true },
-  { href: "/pembelanjaan", label: "Pengeluaran", short: "Keluar", ownerOnly: true, primary: true },
-  { href: "/utang", label: "Utang & Hutang", short: "Hutang", ownerOnly: false },
-  { href: "/produk", label: "Produk", short: "Produk", ownerOnly: true },
-  { href: "/users", label: "User", short: "User", ownerOnly: true },
-  { href: "/barcode", label: "Barcode", short: "QR", ownerOnly: true },
-  { href: "/modal", label: "Modal", short: "Modal", ownerOnly: true },
-  { href: "/audit", label: "Audit", short: "Audit", ownerOnly: true },
-  { href: "/pengaturan", label: "Pengaturan", short: "Set", ownerOnly: true },
-  { href: "/panduan", label: "Panduan", short: "Bantu", ownerOnly: false },
-];
 
 interface TokoSettings {
   namaToko: string;
@@ -81,6 +69,22 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     setMoreOpen(false);
   }, [pathname]);
 
+  useEffect(() => {
+    if (!user || user.role !== "KASIR") return;
+    const allowed = new Set(flattenNav("KASIR").map((item) => item.href));
+    const blocked = !Array.from(allowed).some((href) => isNavActive(pathname, href));
+    if (blocked) router.replace("/pos");
+  }, [user, pathname, router]);
+
+  useEffect(() => {
+    if (!moreOpen) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, [moreOpen]);
+
   async function handleLogout() {
     await fetch("/api/auth/logout", { method: "POST" });
     router.push("/login");
@@ -97,15 +101,14 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     );
   }
 
-  const isKasir = user.role === "KASIR";
-  const visible = NAV_ITEMS.filter((item) => !item.ownerOnly || !isKasir);
-  const primaryItems = isKasir
-    ? visible.filter((i) => i.href === "/pos" || i.href === "/utang")
-    : visible.filter((i) => i.primary);
-  const moreItems = isKasir
-    ? visible.filter((i) => i.href !== "/pos" && i.href !== "/utang")
-    : visible.filter((i) => !i.primary);
-  const moreActive = moreItems.some((i) => pathname.startsWith(i.href));
+  const groups = groupsForRole(user.role);
+  const tabs = tabItemsForRole(user.role);
+  const moreGroups = moreItemsForRole(user.role);
+  const moreItems = moreGroups.flatMap((g) => g.items);
+  const moreActive = moreItems.some((i) => isNavActive(pathname, i.href));
+  const current = currentNavItem(pathname, user.role);
+  const pageTitle = current?.label || settings.namaToko;
+  const roleLabel = user.role === "OWNER" ? "Pemilik" : "Kasir";
 
   return (
     <div className="min-h-dvh flex bg-background">
@@ -120,7 +123,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
               />
             ) : (
               <div
-                className="w-10 h-10 rounded-xl text-white flex items-center justify-center font-bold text-lg shrink-0 shadow-sm transition-colors"
+                className="w-10 h-10 rounded-xl text-white flex items-center justify-center font-bold text-lg shrink-0 shadow-sm"
                 style={{ backgroundColor: settings.logoColor || "#15803d" }}
               >
                 {settings.logoText || (settings.namaToko ? settings.namaToko.slice(0, 1).toUpperCase() : "B")}
@@ -129,39 +132,51 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             <div className="min-w-0">
               <p className="font-bold text-[15px] leading-tight truncate">{settings.namaToko}</p>
               <p className="text-xs text-muted-foreground truncate">
-                {user.username} · {user.role === "OWNER" ? "Pemilik" : "Kasir"}
+                {user.username} · {roleLabel}
               </p>
             </div>
           </div>
         </div>
 
-        <nav className="flex-1 p-3 space-y-0.5 overflow-y-auto">
-          {visible.map((item) => {
-            const active = pathname.startsWith(item.href);
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors ${
-                  active
-                    ? "bg-primary-soft text-primary"
-                    : "text-muted-foreground hover:bg-muted hover:text-foreground"
-                }`}
-              >
-                <span
-                  className={`w-2 h-2 rounded-full shrink-0 ${active ? "bg-primary" : "bg-border"}`}
-                />
-                {item.label}
-              </Link>
-            );
-          })}
+        <nav className="flex-1 p-3 overflow-y-auto">
+          {groups.map((group, index) => (
+            <div key={group.id} className={index > 0 ? "mt-4" : ""}>
+              <p className="px-3 pb-1.5 text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">
+                {group.label}
+              </p>
+              <div className="space-y-0.5">
+                {group.items.map((item) => {
+                  const active = isNavActive(pathname, item.href);
+                  return (
+                    <Link
+                      key={item.href}
+                      href={item.href}
+                      className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors min-h-11 ${
+                        active
+                          ? "bg-primary-soft text-primary"
+                          : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                      }`}
+                    >
+                      <NavIcon
+                        name={item.icon}
+                        className="w-[18px] h-[18px] shrink-0"
+                        strokeWidth={active ? 2.4 : 2}
+                      />
+                      {item.label}
+                    </Link>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
         </nav>
 
         <div className="p-3 border-t border-border">
           <button
             onClick={handleLogout}
-            className="w-full py-2.5 rounded-xl text-sm font-medium text-muted-foreground hover:bg-danger-soft hover:text-danger transition-colors"
+            className="w-full py-2.5 rounded-xl text-sm font-medium text-muted-foreground hover:bg-danger-soft hover:text-danger transition-colors min-h-11 inline-flex items-center justify-center gap-2"
           >
+            <LogOut className="w-4 h-4" />
             Keluar
           </button>
         </div>
@@ -169,126 +184,123 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
       <div className="flex-1 flex flex-col min-w-0 min-h-dvh">
         <header
-          className="md:hidden sticky top-0 z-30 bg-primary text-white px-4 py-3 flex items-center justify-between shadow-sm"
-          style={{ paddingTop: "calc(0.75rem + var(--safe-top))" }}
+          className="md:hidden sticky top-0 z-30 bg-primary text-white px-4 flex items-center justify-between gap-3"
+          style={{ paddingTop: "calc(0.7rem + var(--safe-top))", paddingBottom: "0.7rem" }}
         >
           <div className="min-w-0">
-            <h1 className="text-base font-bold leading-tight truncate">{settings.namaToko}</h1>
-            <p className="text-[11px] opacity-80 truncate">
-              {user.username} · {user.role === "OWNER" ? "Pemilik" : "Kasir"}
-            </p>
+            <p className="text-[11px] text-white/75 truncate">{settings.namaToko}</p>
+            <h1 className="text-base font-bold leading-tight truncate">{pageTitle}</h1>
           </div>
           <button
             onClick={handleLogout}
-            className="text-xs bg-white/15 px-3 py-2 rounded-xl hover:bg-white/25 active:bg-white/30 transition-colors font-medium"
+            className="shrink-0 min-h-11 min-w-11 px-3 rounded-xl bg-white/15 hover:bg-white/25 active:bg-white/30 transition-colors font-medium text-xs inline-flex items-center justify-center gap-1.5"
+            aria-label="Keluar"
           >
+            <LogOut className="w-4 h-4" />
             Keluar
           </button>
         </header>
 
         <header className="hidden md:flex sticky top-0 z-20 bg-surface/90 backdrop-blur border-b border-border px-6 py-3.5 items-center justify-between">
           <div>
-            <p className="text-sm font-semibold text-foreground">
-              {visible.find((i) => pathname.startsWith(i.href))?.label || settings.namaToko}
-            </p>
+            <p className="text-sm font-semibold text-foreground">{pageTitle}</p>
             <p className="text-xs text-muted-foreground">{settings.slogan || "Toko beras keluarga"}</p>
           </div>
+          <p className="text-xs text-muted-foreground">
+            {user.username} · {roleLabel}
+          </p>
         </header>
 
-        <main className="flex-1 p-3 sm:p-4 md:p-6 pb-24 md:pb-8">{children}</main>
+        <main className="flex-1 p-3 sm:p-4 md:p-6 pb-[calc(5.75rem+var(--safe-bottom))] md:pb-8">
+          {children}
+        </main>
 
-        {!isKasir && (
-          <nav
-            className="md:hidden fixed bottom-0 inset-x-0 z-40 bg-surface border-t border-border shadow-[0_-4px_20px_rgb(15_31_20/0.06)]"
-            style={{ paddingBottom: "var(--safe-bottom)" }}
-          >
-            <div className="flex items-stretch">
-              {primaryItems.map((item) => {
-                const active = pathname.startsWith(item.href);
-                return (
-                  <Link
-                    key={item.href}
-                    href={item.href}
-                    className={`flex-1 flex flex-col items-center justify-center gap-0.5 py-2.5 min-h-[56px] text-[11px] font-semibold transition-colors ${
-                      active ? "text-primary" : "text-muted-foreground"
+        <nav
+          className="md:hidden fixed bottom-0 inset-x-0 z-40 bg-surface/95 backdrop-blur-md border-t border-border shadow-[0_-8px_24px_rgb(15_31_20/0.08)]"
+          style={{ paddingBottom: "var(--safe-bottom)" }}
+        >
+          <div className="flex items-stretch px-1">
+            {tabs.map((item) => {
+              const active = isNavActive(pathname, item.href);
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  className={`flex-1 flex flex-col items-center justify-center gap-0.5 py-2 min-h-[58px] text-[10px] font-semibold transition-colors ${
+                    active ? "text-primary" : "text-muted-foreground"
+                  }`}
+                >
+                  <span
+                    className={`w-10 h-8 rounded-xl inline-flex items-center justify-center ${
+                      active ? "bg-primary-soft" : ""
                     }`}
                   >
-                    <span
-                      className={`w-8 h-1 rounded-full mb-0.5 ${active ? "bg-primary" : "bg-transparent"}`}
-                    />
-                    {item.short}
-                  </Link>
-                );
-              })}
+                    <NavIcon name={item.icon} className="w-5 h-5" strokeWidth={active ? 2.4 : 2} />
+                  </span>
+                  {item.short}
+                </Link>
+              );
+            })}
+            {moreItems.length > 0 && (
               <button
                 onClick={() => setMoreOpen((v) => !v)}
-                className={`flex-1 flex flex-col items-center justify-center gap-0.5 py-2.5 min-h-[56px] text-[11px] font-semibold transition-colors ${
+                className={`flex-1 flex flex-col items-center justify-center gap-0.5 py-2 min-h-[58px] text-[10px] font-semibold transition-colors ${
                   moreOpen || moreActive ? "text-primary" : "text-muted-foreground"
                 }`}
+                aria-label="Menu lainnya"
+                aria-expanded={moreOpen}
               >
                 <span
-                  className={`w-8 h-1 rounded-full mb-0.5 ${moreOpen || moreActive ? "bg-primary" : "bg-transparent"}`}
-                />
-                Lainnya
+                  className={`w-10 h-8 rounded-xl inline-flex items-center justify-center ${
+                    moreOpen || moreActive ? "bg-primary-soft" : ""
+                  }`}
+                >
+                  <NavIcon name="more" className="w-5 h-5" strokeWidth={moreOpen || moreActive ? 2.4 : 2} />
+                </span>
+                Menu
               </button>
-            </div>
-          </nav>
-        )}
-
-        {isKasir && (
-          <nav
-            className="md:hidden fixed bottom-0 inset-x-0 z-40 bg-surface border-t border-border shadow-[0_-4px_20px_rgb(15_31_20/0.06)]"
-            style={{ paddingBottom: "var(--safe-bottom)" }}
-          >
-            <div className="flex items-stretch">
-              {primaryItems.map((item) => {
-                const active = pathname.startsWith(item.href);
-                return (
-                  <Link
-                    key={item.href}
-                    href={item.href}
-                    className={`flex-1 flex flex-col items-center justify-center gap-0.5 py-2.5 min-h-[56px] text-[11px] font-semibold transition-colors ${
-                      active ? "text-primary" : "text-muted-foreground"
-                    }`}
-                  >
-                    <span className={`w-8 h-1 rounded-full mb-0.5 ${active ? "bg-primary" : "bg-transparent"}`} />
-                    {item.short}
-                  </Link>
-                );
-              })}
-            </div>
-          </nav>
-        )}
+            )}
+          </div>
+        </nav>
 
         {moreOpen && (
           <div className="md:hidden fixed inset-0 z-50">
-            <button
-              className="absolute inset-0 bg-black/40"
-              onClick={() => setMoreOpen(false)}
-              aria-label="Tutup menu"
-            />
-            <div className="absolute bottom-0 inset-x-0 bg-surface rounded-t-2xl shadow-lg max-h-[70dvh] overflow-y-auto safe-pb">
+            <button className="absolute inset-0 bg-black/45" onClick={() => setMoreOpen(false)} aria-label="Tutup menu" />
+            <div className="absolute bottom-0 inset-x-0 bg-surface rounded-t-3xl shadow-lg max-h-[78dvh] overflow-y-auto safe-pb">
               <div className="flex justify-center pt-3 pb-1">
                 <div className="w-10 h-1 rounded-full bg-border" />
               </div>
-              <p className="px-5 pt-2 pb-3 text-sm font-semibold text-muted-foreground">Menu Lainnya</p>
-              <div className="px-3 pb-4 grid grid-cols-2 gap-2">
-                {moreItems.map((item) => {
-                  const active = pathname.startsWith(item.href);
-                  return (
-                    <Link
-                      key={item.href}
-                      href={item.href}
-                      className={`rounded-xl border px-4 py-3.5 text-sm font-medium transition-colors ${
-                        active
-                          ? "border-primary bg-primary-soft text-primary"
-                          : "border-border bg-surface text-foreground active:bg-muted"
-                      }`}
-                    >
-                      {item.label}
-                    </Link>
-                  );
-                })}
+              <div className="px-5 pt-1 pb-2">
+                <p className="text-base font-bold">Menu {roleLabel}</p>
+                <p className="text-xs text-muted-foreground mt-0.5">Dikelompokkan sesuai pekerjaan {roleLabel.toLowerCase()}</p>
+              </div>
+              <div className="px-3 pb-5 space-y-4">
+                {moreGroups.map((group) => (
+                  <div key={group.id}>
+                    <p className="px-2 pb-1.5 text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">
+                      {group.label}
+                    </p>
+                    <div className="grid grid-cols-2 gap-2">
+                      {group.items.map((item) => {
+                        const active = isNavActive(pathname, item.href);
+                        return (
+                          <Link
+                            key={item.href}
+                            href={item.href}
+                            className={`min-h-[72px] rounded-2xl border px-3.5 py-3 text-sm font-medium transition-colors flex flex-col justify-center gap-1.5 ${
+                              active
+                                ? "border-primary bg-primary-soft text-primary"
+                                : "border-border bg-surface text-foreground active:bg-muted"
+                            }`}
+                          >
+                            <NavIcon name={item.icon} className="w-5 h-5" strokeWidth={active ? 2.4 : 2} />
+                            {item.label}
+                          </Link>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ))}
               </div>
             </div>
           </div>

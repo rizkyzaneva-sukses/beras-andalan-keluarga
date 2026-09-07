@@ -2,19 +2,20 @@
 
 import { useEffect, useState } from "react";
 import { ModalEntry } from "@/types";
+import { todayWib } from "@/lib/date";
 
 export default function ModalPage() {
   const [modal, setModal] = useState<ModalEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
-  const [form, setForm] = useState({ jumlah: "", tanggal: new Date().toISOString().slice(0, 10), keterangan: "" });
+  const [form, setForm] = useState({ jumlah: "", tanggal: todayWib(), keterangan: "" });
   const [error, setError] = useState("");
 
   async function fetchModal() { const res = await fetch("/api/modal"); const data = await res.json(); if (Array.isArray(data)) setModal(data); setLoading(false); }
   useEffect(() => { fetchModal(); }, []);
 
-  function openAdd() { setEditId(null); setForm({ jumlah: "", tanggal: new Date().toISOString().slice(0, 10), keterangan: "" }); setShowForm(true); setError(""); }
+  function openAdd() { setEditId(null); setForm({ jumlah: "", tanggal: todayWib(), keterangan: "" }); setShowForm(true); setError(""); }
   function openEdit(m: ModalEntry) { setEditId(m.id); setForm({ jumlah: String(m.jumlah), tanggal: m.tanggal.slice(0, 10), keterangan: m.keterangan || "" }); setShowForm(true); setError(""); }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -33,9 +34,12 @@ export default function ModalPage() {
 
   return (
     <div className="page-wrap space-y-4">
-      <div className="flex justify-between items-center">
-        <h2 className="text-lg font-bold">Modal Awal</h2>
-        <button onClick={openAdd} className="bg-primary text-white px-4 py-2.5 rounded-lg text-sm font-medium hover:bg-primary-hover active:bg-primary-hover/80 transition-colors shadow-sm">+ Tambah Modal</button>
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <h1 className="text-[1.35rem] font-bold tracking-tight leading-tight">Modal Awal</h1>
+          <p className="text-sm text-muted-foreground mt-0.5">Setoran modal yang masuk ke kas toko</p>
+        </div>
+        <button onClick={openAdd} className="btn-primary px-4 text-sm shrink-0">+ Tambah</button>
       </div>
 
       <div className="bg-primary/5 border border-primary/20 rounded-xl p-4 text-center shadow-sm">
@@ -66,9 +70,9 @@ export default function ModalPage() {
                   <p className="font-mono font-bold text-primary text-[15px]">{formatRupiah(m.jumlah)}</p>
                   <p className="text-xs text-muted-foreground mt-0.5">{new Date(m.tanggal).toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" })}</p>
                 </div>
-                <div className="flex flex-col gap-0.5">
-                  <button onClick={() => openEdit(m)} className="px-2.5 py-1 text-xs text-primary font-medium hover:bg-primary/10 rounded transition-colors">Edit</button>
-                  <button onClick={() => handleDelete(m.id)} className="px-2.5 py-1 text-xs text-danger font-medium hover:bg-red-50 rounded transition-colors">Hapus</button>
+                <div className="flex flex-col gap-1">
+                  <button onClick={() => openEdit(m)} className="min-h-10 px-3 text-xs text-primary font-semibold hover:bg-primary/10 rounded-xl transition-colors">Edit</button>
+                  <button onClick={() => handleDelete(m.id)} className="min-h-10 px-3 text-xs text-danger font-semibold hover:bg-danger-soft rounded-xl transition-colors">Hapus</button>
                 </div>
               </div>
               {m.keterangan && <p className="text-sm text-muted-foreground mt-1">{m.keterangan}</p>}

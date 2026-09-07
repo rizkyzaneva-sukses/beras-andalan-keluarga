@@ -191,7 +191,10 @@ export default function UtangPage() {
   /* ---- render ---- */
   return (
     <div className="page-wrap space-y-4">
-      <h2 className="text-lg font-bold">Utang & Hutang Pelanggan</h2>
+      <div>
+        <h1 className="text-[1.35rem] font-bold tracking-tight leading-tight">Utang & Hutang</h1>
+        <p className="text-sm text-muted-foreground mt-0.5">Tagihan pelanggan dan utang toko ke supplier</p>
+      </div>
 
       {/* tab: pelanggan / toko */}
       {showToko && (
@@ -199,14 +202,14 @@ export default function UtangPage() {
           <button
             type="button"
             onClick={() => { setTab("pelanggan"); setPayId(null); setError(""); }}
-            className={`flex-1 py-2.5 rounded-lg text-sm font-semibold ${tab === "pelanggan" ? "bg-white shadow-sm" : "text-muted-foreground"}`}
+            className={`flex-1 min-h-11 py-2.5 rounded-lg text-sm font-semibold ${tab === "pelanggan" ? "bg-white shadow-sm" : "text-muted-foreground"}`}
           >
             Hutang Pelanggan
           </button>
           <button
             type="button"
             onClick={() => { setTab("toko"); setPayId(null); setError(""); }}
-            className={`flex-1 py-2.5 rounded-lg text-sm font-semibold ${tab === "toko" ? "bg-white shadow-sm" : "text-muted-foreground"}`}
+            className={`flex-1 min-h-11 py-2.5 rounded-lg text-sm font-semibold ${tab === "toko" ? "bg-white shadow-sm" : "text-muted-foreground"}`}
           >
             Utang Toko
           </button>
@@ -214,13 +217,13 @@ export default function UtangPage() {
       )}
 
       {/* filter: semua / belum lunas / lunas */}
-      <div className="flex gap-1.5">
+      <div className="flex gap-1.5 overflow-x-auto scrollbar-none -mx-1 px-1">
         {(Object.keys(STATUS_LABELS) as StatusFilter[]).map((s) => (
           <button
             key={s}
             type="button"
             onClick={() => { setStatusFilter(s); setPayId(null); setExpandedId(null); setError(""); }}
-            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
+            className={`shrink-0 min-h-11 px-3.5 py-2 rounded-xl text-xs font-semibold transition-colors ${
               statusFilter === s
                 ? s === "belum_lunas"
                   ? "bg-amber-500 text-white"

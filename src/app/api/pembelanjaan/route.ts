@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/session";
 import { writeAudit } from "@/lib/audit";
-import { isProdukTimbang, isValidQty, lineTotal, toQty } from "@/lib/qty";
+import { allowsFractionQty, isValidQty, lineTotal, toQty } from "@/lib/qty";
 
 export async function GET(request: NextRequest) {
   const session = await getSession();
@@ -41,8 +41,10 @@ export async function POST(request: NextRequest) {
   }
   const jumlah = toQty(rawJumlah);
   const linkedId = typeof produkId === "string" && produkId ? produkId : null;
-  const linkedProduk = linkedId ? await prisma.produk.findUnique({ where: { id: linkedId }, select: { nama: true } }) : null;
-  const allowFraction = isProdukTimbang(namaBarang) || Boolean(linkedProduk && isProdukTimbang(linkedProduk.nama));
+  const linkedProduk = linkedId
+    ? await prisma.produk.findUnique({ where: { id: linkedId }, select: { nama: true, tipe: true, satuan: true } })
+    : null;
+  const allowFraction = allowsFractionQty(linkedProduk || { nama: namaBarang });
   if (
     !isValidQty(jumlah, { allowFraction }) ||
     !Number.isInteger(harga) ||

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/session";
 import { writeAudit } from "@/lib/audit";
+import { todayWib, wibCalendarUtc } from "@/lib/date";
 
 export async function POST(request: NextRequest) {
   const session = await getSession();
@@ -19,7 +20,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Jumlah pembayaran melebihi sisa utang" }, { status: 400 });
   }
   const bayar = await prisma.pembayaranUtang.create({
-    data: { pembelanjaanId, jumlah, tanggal: new Date(), createdBy: session.userId },
+    data: { pembelanjaanId, jumlah, tanggal: wibCalendarUtc(todayWib()), createdBy: session.userId },
   });
   await writeAudit({
     entityType: "UTANG",

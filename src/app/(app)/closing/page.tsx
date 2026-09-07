@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { todayWib } from "@/lib/date";
 
 interface ClosingData {
   tanggal: string;
@@ -13,6 +14,7 @@ interface ClosingData {
   labaRugi: number;
   totalModal: number;
   totalPiutang: number;
+  saldoKas: number;
 }
 
 interface OmsetKasir {
@@ -34,8 +36,7 @@ export default function ClosingPage() {
 
   useEffect(() => {
     async function fetchClosing() {
-      const now = new Date();
-      const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+      const today = todayWib();
 
       const [summaryRes, penjualanRes, pembelanjaanRes, omsetRes] = await Promise.all([
         fetch(`/api/laporan/summary?from=${today}&to=${today}`).then((r) => r.json()),
@@ -61,6 +62,7 @@ export default function ClosingPage() {
         labaRugi: summaryRes.labaRugi || 0,
         totalModal: summaryRes.totalModal || 0,
         totalPiutang: summaryRes.totalPiutang || 0,
+        saldoKas: summaryRes.saldoKas || 0,
       });
       setLoading(false);
     }
@@ -73,8 +75,10 @@ export default function ClosingPage() {
 
   return (
     <div className="page-wrap space-y-4">
-      <h2 className="text-lg font-bold">Closing Harian</h2>
-      <p className="text-sm text-muted-foreground -mt-2">{tglIndo}</p>
+      <div>
+        <h1 className="text-[1.35rem] font-bold tracking-tight leading-tight">Closing Harian</h1>
+        <p className="text-sm text-muted-foreground mt-0.5">{tglIndo}</p>
+      </div>
 
       {loading ? (
         <div className="text-center py-10"><div className="inline-block w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin" /><p className="text-muted-foreground text-sm mt-2">Memuat...</p></div>
@@ -122,7 +126,8 @@ export default function ClosingPage() {
             <div className="flex justify-between"><span className="text-muted-foreground">Total Modal</span><span className="font-mono font-medium">{formatRupiah(data.totalModal)}</span></div>
             <div className="flex justify-between"><span className="text-muted-foreground">Pendapatan</span><span className="font-mono font-medium text-green-700">+{formatRupiah(data.totalPendapatan)}</span></div>
             <div className="flex justify-between"><span className="text-muted-foreground">Pengeluaran</span><span className="font-mono font-medium text-red-600">-{formatRupiah(data.totalPengeluaran)}</span></div>
-            <div className="border-t border-border pt-2 flex justify-between"><span className="font-semibold">Saldo Kas Saat Ini</span><span className="font-mono font-bold text-primary text-[15px]">{formatRupiah(data.totalModal + data.totalPendapatan - data.totalPengeluaran)}</span></div>
+            <p className="text-[11px] text-muted-foreground">Pendapatan/pengeluaran di atas untuk hari ini. Saldo kas dihitung dari seluruh modal + uang masuk − uang keluar sampai hari ini.</p>
+            <div className="border-t border-border pt-2 flex justify-between"><span className="font-semibold">Saldo Kas Saat Ini</span><span className="font-mono font-bold text-primary text-[15px]">{formatRupiah(data.saldoKas)}</span></div>
           </div>
 
           {omsetKasir.length > 0 && (
@@ -138,7 +143,7 @@ export default function ClosingPage() {
                       </div>
                       <p className="font-mono font-bold text-[15px]">{formatRupiah(u.total)}</p>
                     </div>
-                    <div className="mt-2 grid grid-cols-4 gap-1.5 text-[11px]">
+                    <div className="mt-2 grid grid-cols-2 sm:grid-cols-4 gap-1.5 text-[11px]">
                       <div className="rounded-lg bg-muted px-2 py-1.5"><span className="text-muted-foreground">Tunai</span><p className="font-mono font-semibold">{u.cashTotal > 0 ? formatRupiah(u.cashTotal) : "—"}</p></div>
                       <div className="rounded-lg bg-muted px-2 py-1.5"><span className="text-muted-foreground">Transfer</span><p className="font-mono font-semibold">{u.transferTotal > 0 ? formatRupiah(u.transferTotal) : "—"}</p></div>
                       <div className="rounded-lg bg-muted px-2 py-1.5"><span className="text-muted-foreground">QRIS</span><p className="font-mono font-semibold">{u.qrisTotal > 0 ? formatRupiah(u.qrisTotal) : "—"}</p></div>

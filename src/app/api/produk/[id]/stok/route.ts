@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/session";
 import { writeAudit } from "@/lib/audit";
-import { formatQty, hasEnoughStock, isProdukTimbang, isValidQty, lineTotal, toQty } from "@/lib/qty";
+import { allowsFractionQty, formatQty, hasEnoughStock, isValidQty, toQty } from "@/lib/qty";
 
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const session = await getSession();
@@ -11,7 +11,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   }
 
   const { id } = await params;
-  const { arah, jumlah: rawJumlah, harga, statusBayar, catatan } = await request.json();
+  const { arah, jumlah: rawJumlah, harga, catatan } = await request.json();
   const jumlah = toQty(rawJumlah);
   const produk = await prisma.produk.findUnique({ where: { id } });
   if (!produk || !produk.aktif) {
@@ -24,7 +24,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     );
   }
 
-  if (!["tambah", "kurang"].includes(arah) || !isValidQty(jumlah, { allowFraction: isProdukTimbang(produk.nama) })) {
+  if (!["tambah", "kurang"].includes(arah) || !isValidQty(jumlah, { allowFraction: allowsFractionQty(produk) })) {
     return NextResponse.json({ error: "Jumlah stok tidak valid" }, { status: 400 });
   }
 
@@ -42,26 +42,9 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         : hargaBeli
       : produk.hppRataRata;
 
-    await prisma.$transaction(async (tx) => {
-      await tx.produk.update({
-        where: { id },
-        data: { stok: { increment: jumlah }, hppRataRata: hppBaru },
-      });
-      if (hargaBeli) {
-        await tx.pembelanjaan.create({
-          data: {
-            tanggal: new Date(new Date().toLocaleDateString("sv-SE") + "T00:00:00.000Z"),
-            kategori: "RESTOCK",
-            namaBarang: produk.nama,
-            jumlah,
-            harga: hargaBeli,
-            total: lineTotal(jumlah, hargaBeli),
-            statusBayar: statusBayar === "KREDIT" ? "KREDIT" : "CASH",
-            produkId: id,
-            createdBy: session.userId!,
-          },
-        });
-      }
+    await prisma.produk.update({
+      where: { id },
+      data: { stok: { increment: jumlah }, hppRataRata: hppBaru },
     });
   } else {
     await prisma.produk.update({

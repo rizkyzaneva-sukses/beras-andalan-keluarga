@@ -39,6 +39,7 @@ export async function POST(request: NextRequest) {
       id: true,
       nama: true,
       tipe: true,
+      satuan: true,
     },
   });
   if (produkList.length !== produkIds.length) {

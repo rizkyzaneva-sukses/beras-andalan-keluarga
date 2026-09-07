@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/session";
 import { writeAudit } from "@/lib/audit";
+import { todayWib, wibCalendarUtc } from "@/lib/date";
 
 export async function POST(request: NextRequest) {
   const session = await getSession();
@@ -31,7 +32,7 @@ export async function POST(request: NextRequest) {
       data: {
         piutangId,
         jumlah,
-        tanggal: new Date(),
+        tanggal: wibCalendarUtc(todayWib()),
         metodeBayar: metode,
         createdBy: session.userId!,
       },
