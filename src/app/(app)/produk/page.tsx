@@ -992,6 +992,7 @@ export default function ProdukPage() {
                         className="text-danger text-sm font-bold px-1"
                       >×</button>
                     </div>
+                    </div>
                     {k.qtyPerBatch && !qtyOk && (
                       <p className="text-[11px] text-danger">Pakai ½, 1, 1½, 2, … karung</p>
                     )}
