@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/session";
 import { writeAudit } from "@/lib/audit";
@@ -127,26 +128,57 @@ export async function POST(request: NextRequest) {
     finalSatuan = "kg";
   }
 
-  const produk = await prisma.produk.create({
-    data: {
-      nama,
-      satuan: finalSatuan,
-      hargaBeli: finalHargaBeli,
-      hargaJual: Number(hargaJual),
-      hppRataRata: tipE === "GABUNGAN" ? finalHargaBeli : 0,
-      tipe: tipE,
-      isiPerKarung: tipE === "KARUNG" && isiPerKarung ? Number(isiPerKarung) : null,
-      sumberProdukId: tipE === "ECERAN" ? sumberProdukId : null,
-      komposisiResep:
-        tipE === "GABUNGAN" && komposisi
-          ? {
-              create: komposisi.map((k: { sumberId: string; qtyPerBatch: number }) => ({
-                sumberId: k.sumberId,
-                qtyPerBatch: Number(k.qtyPerBatch),
-              })),
-            }
-          : undefined,
-    },
+  const produk = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+    const created = await tx.produk.create({
+      data: {
+        nama,
+        satuan: finalSatuan,
+        hargaBeli: finalHargaBeli,
+        hargaJual: Number(hargaJual),
+        hppRataRata: tipE === "GABUNGAN" ? finalHargaBeli : 0,
+        tipe: tipE,
+        isiPerKarung: tipE === "KARUNG" && isiPerKarung ? Number(isiPerKarung) : null,
+        sumberProdukId: tipE === "ECERAN" ? sumberProdukId : null,
+        komposisiResep:
+          tipE === "GABUNGAN" && komposisi
+            ? {
+                create: komposisi.map((k: { sumberId: string; qtyPerBatch: number }) => ({
+                  sumberId: k.sumberId,
+                  qtyPerBatch: Number(k.qtyPerBatch),
+                })),
+              }
+            : undefined,
+      },
+    });
+
+    // Kurangi stok sumber karung saat membuat produk GABUNGAN
+    if (tipE === "GABUNGAN" && komposisi) {
+      for (const k of komposisi) {
+        const qty = Number(k.qtyPerBatch);
+        if (!qty || qty <= 0) continue;
+
+        const sumber = await tx.produk.findUnique({
+          where: { id: k.sumberId },
+          select: { id: true, nama: true, stok: true },
+        });
+
+        if (!sumber) {
+          throw new Error(`Produk sumber tidak ditemukan: ${k.sumberId}`);
+        }
+        if (toQty(sumber.stok) < qty) {
+          throw new Error(
+            `Stok ${sumber.nama} tidak cukup (${toQty(sumber.stok)} karung, butuh ${qty})`,
+          );
+        }
+
+        await tx.produk.update({
+          where: { id: k.sumberId },
+          data: { stok: { decrement: qty } },
+        });
+      }
+    }
+
+    return created;
   });
 
   await writeAudit({

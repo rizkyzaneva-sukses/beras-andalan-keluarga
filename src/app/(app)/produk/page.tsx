@@ -927,9 +927,9 @@ export default function ProdukPage() {
                   const qtyOk = Number.isFinite(qty) && isKelipatanSetengahKarung(qty);
                   return (
                   <div key={i} className="space-y-1">
-                    <div className="flex gap-2 items-center">
+                    <div className="flex flex-col sm:flex-row sm:items-center gap-2">
                       <SearchSelect
-                        className="flex-1 min-w-0"
+                        className="flex-1 min-w-0 sm:min-w-[200px]"
                         value={k.sumberId}
                         onChange={(v) => {
                           const next = [...formKomposisi];
@@ -943,7 +943,8 @@ export default function ProdukPage() {
                           description: `${formatRupiah(kr.hppRataRata > 0 ? kr.hppRataRata : kr.hargaBeli)}/karung · ${formatQty(kr.isiPerKarung || 25)} kg`,
                         }))}
                       />
-                      <div className="flex items-center gap-1 shrink-0">
+                      <div className="flex items-center gap-1.5 sm:gap-1">
+                        <div className="flex items-center gap-1 shrink-0">
                         <button
                           type="button"
                           onClick={() => {
@@ -982,13 +983,13 @@ export default function ProdukPage() {
                           +
                         </button>
                       </div>
-                      <span className="text-xs text-muted-foreground whitespace-nowrap w-14">
+                      <span className="text-xs text-muted-foreground whitespace-nowrap">
                         {qtyOk ? formatKarungQty(qty) : "—"} karung
                       </span>
                       <button
                         type="button"
                         onClick={() => setFormKomposisi(formKomposisi.filter((_, j) => j !== i))}
-                        className="text-danger text-sm font-bold px-2"
+                        className="text-danger text-sm font-bold px-1"
                       >×</button>
                     </div>
                     {k.qtyPerBatch && !qtyOk && (
