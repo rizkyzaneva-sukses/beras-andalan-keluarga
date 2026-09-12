@@ -43,12 +43,20 @@ export function expandStokDelta(meta: ProdukStokMeta, qtyDelta: number): StokDel
     }
     // qty = kg terjual; potong karung proporsional terhadap total kg resep.
     const rasio = qty / totalKg;
-    return meta.komposisiResep.map((k) => ({
+    const sourceDeltas = meta.komposisiResep.map((k) => ({
       produkId: k.sumberId,
       delta: toQty(rasio * toQty(k.qtyPerBatch)),
       nama: k.sumber?.nama || meta.nama,
       satuan: k.sumber?.satuan || "",
     }));
+    // Stok GABUNGAN independen — potong juga stok gabungan itu sendiri
+    sourceDeltas.push({
+      produkId: meta.id,
+      delta: qty,
+      nama: meta.nama,
+      satuan: "kg",
+    });
+    return sourceDeltas;
   }
 
   return [

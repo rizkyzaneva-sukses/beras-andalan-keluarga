@@ -4,7 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/session";
 import { writeAudit } from "@/lib/audit";
 import { toQty } from "@/lib/qty";
-import { hitungHppGabungan, hitungStokGabunganKg } from "@/lib/gabungan";
+import { hitungHppGabungan, hitungStokGabunganKg, totalKgResep } from "@/lib/gabungan";
 import { resolveHargaBeliGabungan } from "@/lib/harga-beli-gabungan";
 
 export async function GET() {
@@ -78,7 +78,8 @@ export async function GET() {
           base.hppRataRata = hpp.hppPerKg;
         }
         base.totalKgResep = hpp.totalKg;
-        base.stokGabungan = hitungStokGabunganKg(items);
+        // Stok GABUNGAN independen — ambil dari field stok, bukan dari resep
+        base.stokGabungan = toQty(p.stok);
       }
     }
 
@@ -153,13 +154,14 @@ export async function POST(request: NextRequest) {
 
     // Kurangi stok sumber karung saat membuat produk GABUNGAN
     if (tipE === "GABUNGAN" && komposisi) {
+      const sumberMap = new Map<string, { stok: number; isiPerKarung: number | null }>();
       for (const k of komposisi) {
         const qty = Number(k.qtyPerBatch);
         if (!qty || qty <= 0) continue;
 
         const sumber = await tx.produk.findUnique({
           where: { id: k.sumberId },
-          select: { id: true, nama: true, stok: true },
+          select: { id: true, nama: true, stok: true, isiPerKarung: true },
         });
 
         if (!sumber) {
@@ -174,6 +176,24 @@ export async function POST(request: NextRequest) {
         await tx.produk.update({
           where: { id: k.sumberId },
           data: { stok: { decrement: qty } },
+        });
+        sumberMap.set(k.sumberId, {
+          stok: toQty(sumber.stok) - qty,
+          isiPerKarung: sumber.isiPerKarung ? toQty(sumber.isiPerKarung) : null,
+        });
+      }
+
+      // Set stok GABUNGAN = totalKg dari resep (stok independen)
+      const totalKg = totalKgResep(
+        komposisi.map((k: { sumberId: string; qtyPerBatch: number }) => ({
+          qtyPerBatch: k.qtyPerBatch,
+          isiPerKarung: sumberMap.get(k.sumberId)?.isiPerKarung ?? null,
+        })),
+      );
+      if (totalKg > 0) {
+        await tx.produk.update({
+          where: { id: created.id },
+          data: { stok: totalKg },
         });
       }
     }

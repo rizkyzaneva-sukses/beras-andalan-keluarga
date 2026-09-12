@@ -58,10 +58,7 @@ export async function POST(request: NextRequest) {
       skipped.push({ nama: produk.nama, alasan: "Baris dobel, dilewati" });
       continue;
     }
-    if (produk.tipe === "GABUNGAN") {
-      skipped.push({ nama: produk.nama, alasan: "Produk gabungan dilewati (stok dari resep)" });
-      continue;
-    }
+
     const stokFisik = toQty(item.stokFisik);
     if (!isValidStokCount(stokFisik, { allowFraction: allowsFractionQty(produk) })) {
       skipped.push({ nama: produk.nama, alasan: "Stok fisik tidak valid" });
