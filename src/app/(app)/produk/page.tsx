@@ -575,6 +575,14 @@ export default function ProdukPage() {
     return p.tipe === "GABUNGAN" && p.stokGabungan != null ? toQty(p.stokGabungan) : toQty(p.stok);
   }
 
+  function gabunganStokHint(p: Product, stok: number) {
+    const max = p.maxBatchProduksi ?? 0;
+    if (stok <= 0 && max > 0) return `isi dari karung · ${max} batch`;
+    if (stok <= 0) return "isi dari karung";
+    if (max > 0) return `bisa ${max} batch lagi`;
+    return "";
+  }
+
   function ProductActions({ p }: { p: Product }) {
     return (
       <div className="flex flex-wrap gap-1.5">
@@ -609,7 +617,7 @@ export default function ProdukPage() {
             }}
             className="chip-action bg-purple-50 text-purple-700 dark:bg-purple-950/50 dark:text-purple-300"
           >
-            Buka Karung
+            Isi Stok
           </button>
         )}
         {p.tipe === "GABUNGAN" ? (
@@ -672,9 +680,9 @@ export default function ProdukPage() {
       const maxBatch = target.maxBatchProduksi ?? 0;
       return (
         <div className="bg-purple-50 dark:bg-purple-950/30 border border-purple-200 dark:border-purple-800 rounded-xl p-4 space-y-3 shadow-sm">
-          <h3 className="font-semibold text-[15px] text-purple-950 dark:text-purple-100">Buka Karung · {target.nama}</h3>
+          <h3 className="font-semibold text-[15px] text-purple-950 dark:text-purple-100">Isi Stok · {target.nama}</h3>
           <p className="text-sm text-purple-900 dark:text-purple-200">
-            Potong stok karung sesuai resep, tambah stok campuran. Stok karung utuh yang tidak dibuka tetap ada.
+            Bukan dari belanja supplier. Stok campuran diambil dari karung yang sudah ada di gudang, sesuai resep.
           </p>
           {resep.length === 0 ? (
             <p className="text-sm text-danger font-medium">Resep kosong. Edit produk dulu.</p>
@@ -743,7 +751,7 @@ export default function ProdukPage() {
               disabled={bukaKarungSaving || resep.length === 0 || !allCukup}
               className="flex-1 bg-purple-700 dark:bg-purple-600 text-white py-3 rounded-lg font-semibold disabled:opacity-50"
             >
-              {bukaKarungSaving ? "Membuka..." : `Ya, Buka ${batch} Batch`}
+              {bukaKarungSaving ? "Mengisi..." : `Ya, Isi ${batch} Batch`}
             </button>
             <button
               type="button"
@@ -806,7 +814,7 @@ export default function ProdukPage() {
       <div className="flex flex-col gap-3 sm:flex-row sm:justify-between sm:items-start">
         <div>
           <h2 className="text-xl font-bold tracking-tight">Master Produk</h2>
-          <p className="text-sm text-muted-foreground">Upload banyak, kartu stok di HP, dan Stock Opname (stok diganti, bukan ditambah).</p>
+          <p className="text-sm text-muted-foreground">Karung diisi dari Pengeluaran. Gabungan diisi di sini lewat tombol Isi Stok (ambil dari karung).</p>
         </div>
         <div className="flex flex-wrap gap-2">
           <button
@@ -1070,7 +1078,7 @@ export default function ProdukPage() {
                 Campuran kelipatan ½ karung. Contoh: A 1 + B 1 + C ½ karung (25 kg) = 62,5 kg → Rp 250.000 / 62,5 kg.
               </p>
               <p className="text-[11px] text-purple-800 dark:text-purple-200">
-                Simpan resep saja — stok karung tidak berkurang. Stok campuran bertambah saat <strong>Buka Karung</strong>.
+                Simpan resep saja — stok karung tidak berkurang. Stok campuran diisi nanti lewat tombol <strong>Isi Stok</strong> (ambil dari karung).
               </p>
             </div>
           )}
@@ -1494,9 +1502,9 @@ export default function ProdukPage() {
                       <p className={`font-mono font-bold ${stok <= 0 ? "text-danger" : stok < 10 ? "text-warning" : "text-primary"}`}>
                         {formatQty(stok)} {p.satuan}
                       </p>
-                      {p.tipe === "GABUNGAN" && (p.maxBatchProduksi ?? 0) > 0 && (
+                      {p.tipe === "GABUNGAN" && gabunganStokHint(p, stok) && (
                         <p className="text-[10px] text-purple-700 dark:text-purple-300">
-                          bisa {p.maxBatchProduksi} batch
+                          {gabunganStokHint(p, stok)}
                         </p>
                       )}
                     </div>
@@ -1586,9 +1594,9 @@ export default function ProdukPage() {
                           <span title={p.tipe === "GABUNGAN" ? "Stok campuran siap jual (independen dari karung)" : undefined}>
                             {formatQty(stok)}
                           </span>
-                          {p.tipe === "GABUNGAN" && (p.maxBatchProduksi ?? 0) > 0 && (
+                          {p.tipe === "GABUNGAN" && gabunganStokHint(p, stok) && (
                             <p className="text-[10px] font-medium text-purple-700 dark:text-purple-300">
-                              bisa {p.maxBatchProduksi} batch
+                              {gabunganStokHint(p, stok)}
                             </p>
                           )}
                         </td>

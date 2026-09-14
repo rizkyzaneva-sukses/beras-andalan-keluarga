@@ -46,7 +46,7 @@ export async function POST(request: NextRequest) {
     : null;
   if (kategori === "RESTOCK" && linkedProduk?.tipe === "GABUNGAN") {
     return NextResponse.json(
-      { error: "Produk gabungan tidak di-restock lewat belanja. Buka karung di menu Produk." },
+      { error: "Produk gabungan tidak dibeli di Pengeluaran. Isi stoknya di menu Produk (tombol Isi Stok)." },
       { status: 400 },
     );
   }

@@ -24,7 +24,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   }
   if (produk.tipe === "GABUNGAN" && arah === "tambah") {
     return NextResponse.json(
-      { error: "Stok gabungan ditambah lewat Buka Karung, bukan Isi Stok" },
+      { error: "Stok gabungan diisi lewat tombol Isi Stok (ambil dari karung), bukan angka manual" },
       { status: 400 },
     );
   }

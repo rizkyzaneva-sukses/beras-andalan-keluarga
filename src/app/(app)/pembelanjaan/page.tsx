@@ -5,6 +5,7 @@ import { PembelanjaanEntry, KategoriPembelanjaan, Product } from "@/types";
 import { digitsOnly, formatRibuan, formatRupiah } from "@/lib/money";
 import { allowsFractionQty, formatQty, lineTotal, parseQtyInput, sanitizeQtyInput } from "@/lib/qty";
 import { startOfMonthWib, startOfWeekMondayWib, todayWib } from "@/lib/date";
+import Link from "next/link";
 import { SearchSelect } from "@/components/SearchSelect";
 
 type RangeKey = "today" | "week" | "month" | "custom";
@@ -178,7 +179,11 @@ export default function PembelanjaanPage() {
                   }}
                 />
               )}
-              <p className="text-[11px] text-muted-foreground mt-1">Restock otomatis menambah stok karung/eceran. Produk gabungan diisi lewat Buka Karung di menu Produk.</p>
+              <p className="text-[11px] text-muted-foreground mt-1">
+                Restock di sini untuk karung/eceran yang dibeli dari supplier. Produk gabungan tidak dibeli — isi stoknya di menu{" "}
+                <Link href="/produk" className="text-primary font-semibold underline">Produk</Link>
+                {" "}tombol <strong>Isi Stok</strong> (ambil dari karung yang sudah ada).
+              </p>
             </div>
           ) : (
             <div className="relative">

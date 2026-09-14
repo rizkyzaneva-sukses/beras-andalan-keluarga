@@ -52,7 +52,7 @@ const SOLVED_PROBLEMS = [
     problem:
       "Beras racikan (misal: 50% Ramos + 50% Pandan Wangi) sulit dicatat: resep, restok campuran, dan stok karung utuh sering tercampur.",
     solution:
-      "Resep campuran kelipatan ½ karung, HPP per kg otomatis. Buat data resep tidak memotong karung. Tombol Buka Karung yang memotong stok karung dan menambah stok gabungan. Penjualan karung dan gabungan independen.",
+      "Resep campuran kelipatan ½ karung, HPP per kg otomatis. Buat data resep tidak memotong karung. Tombol Isi Stok di Produk yang memotong karung dan menambah stok gabungan (bukan lewat Pengeluaran). Penjualan karung dan gabungan independen.",
   },
   {
     id: "kasir-closing",
