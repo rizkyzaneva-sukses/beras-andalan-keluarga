@@ -283,13 +283,19 @@ export default function ProdukPage() {
   const aksiProduk = aksiId ? active.find((p) => p.id === aksiId) || null : null;
 
   useEffect(() => {
-    if (!aksiId) return;
+    if (!aksiId && !bukaKarungId) return;
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setAksiId(null);
+      if (e.key !== "Escape") return;
+      setAksiId(null);
+      setBukaKarungId(null);
+      setBukaKarungEceranId("");
+      setBukaKarungBatch("1");
+      setBukaKarungMsg("");
+      setBukaKarungErr("");
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [aksiId]);
+  }, [aksiId, bukaKarungId]);
 
   useEffect(() => {
     tujuanListRef.current = tujuanList;
@@ -597,6 +603,14 @@ export default function ProdukPage() {
     return "";
   }
 
+  function closeBukaKarung() {
+    setBukaKarungId(null);
+    setBukaKarungEceranId("");
+    setBukaKarungBatch("1");
+    setBukaKarungMsg("");
+    setBukaKarungErr("");
+  }
+
   function openBukaKarung(p: Product) {
     setShowForm(false);
     closeStock();
@@ -658,7 +672,9 @@ export default function ProdukPage() {
       const allCukup = rows.length > 0 && rows.every((r) => r.cukup);
       const maxBatch = target.maxBatchProduksi ?? 0;
       return (
-        <div className="bg-purple-50 dark:bg-purple-950/30 border border-purple-200 dark:border-purple-800 rounded-xl p-4 space-y-3 shadow-sm">
+        <div className="fixed inset-0 z-50">
+          <button type="button" className="absolute inset-0 bg-black/45 dark:bg-black/60" onClick={closeBukaKarung} aria-label="Tutup" />
+          <div className="absolute bottom-0 inset-x-0 md:inset-x-auto md:right-4 md:bottom-4 md:w-[400px] max-h-[78dvh] overflow-y-auto bg-purple-50 dark:bg-purple-950 text-purple-950 dark:text-purple-100 border border-purple-200 dark:border-purple-800 rounded-t-3xl md:rounded-2xl p-4 space-y-3 shadow-lg safe-pb">
           <h3 className="font-semibold text-[15px] text-purple-950 dark:text-purple-100">Isi Stok · {target.nama}</h3>
           <p className="text-sm text-purple-900 dark:text-purple-200">
             Bukan dari belanja supplier. Stok campuran diambil dari karung yang sudah ada di gudang, sesuai resep.
@@ -734,9 +750,10 @@ export default function ProdukPage() {
             </button>
             <button
               type="button"
-              onClick={() => { setBukaKarungId(null); setBukaKarungEceranId(""); setBukaKarungBatch("1"); setBukaKarungMsg(""); setBukaKarungErr(""); }}
+              onClick={closeBukaKarung}
               className="px-5 py-3 border border-purple-300 dark:border-purple-700 rounded-lg text-purple-900 dark:text-purple-100 font-medium bg-white dark:bg-zinc-900"
             >Batal</button>
+          </div>
           </div>
         </div>
       );
@@ -746,7 +763,9 @@ export default function ProdukPage() {
     const eceranList = karung.eceranDariProduk || [];
     const tujuan = eceranList.find((e) => e.id === bukaKarungEceranId) || eceranList[0];
     return (
-      <div className="bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 rounded-xl p-4 space-y-3 shadow-sm">
+      <div className="fixed inset-0 z-50">
+        <button type="button" className="absolute inset-0 bg-black/45 dark:bg-black/60" onClick={closeBukaKarung} aria-label="Tutup" />
+        <div className="absolute bottom-0 inset-x-0 md:inset-x-auto md:right-4 md:bottom-4 md:w-[400px] max-h-[78dvh] overflow-y-auto bg-blue-50 dark:bg-blue-950 text-blue-950 dark:text-blue-100 border border-blue-200 dark:border-blue-800 rounded-t-3xl md:rounded-2xl p-4 space-y-3 shadow-lg safe-pb">
         <h3 className="font-semibold text-[15px] text-blue-950 dark:text-blue-100">Buka 1 Karung</h3>
         <p className="text-sm text-blue-900 dark:text-blue-200">
           Buka 1 <strong>{karung.nama}</strong> (stok: {formatQty(karung.stok)} karung) → tambah {karung.isiPerKarung ? formatQty(karung.isiPerKarung) : "25"} kg ke eceran tujuan.
@@ -780,9 +799,10 @@ export default function ProdukPage() {
           </button>
           <button
             type="button"
-            onClick={() => { setBukaKarungId(null); setBukaKarungEceranId(""); setBukaKarungBatch("1"); setBukaKarungMsg(""); setBukaKarungErr(""); }}
+            onClick={closeBukaKarung}
             className="px-5 py-3 border border-blue-300 dark:border-blue-700 rounded-lg text-blue-900 dark:text-blue-100 font-medium bg-white dark:bg-zinc-900"
           >Batal</button>
+        </div>
         </div>
       </div>
     );
