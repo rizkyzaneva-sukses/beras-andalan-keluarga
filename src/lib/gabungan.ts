@@ -109,6 +109,76 @@ export function hitungStokGabunganKg(items: KomponenStok[]) {
   return roundQty(batches * totalKg);
 }
 
+/** Jumlah batch utuh yang bisa diproduksi dari stok karung saat ini. */
+export function maxBatchDariStok(items: { qtyPerBatch: QtyInput; stok: QtyInput }[]) {
+  const cleaned = items.filter((item) => toQty(item.qtyPerBatch) > 0);
+  if (cleaned.length === 0) return 0;
+  let max = Number.POSITIVE_INFINITY;
+  for (const item of cleaned) {
+    const b = toQty(item.stok) / toQty(item.qtyPerBatch);
+    if (b < max) max = b;
+  }
+  if (!Number.isFinite(max) || max <= 0) return 0;
+  return Math.floor(max + 1e-6);
+}
+
+/** Kg campuran yang bisa dibuat dalam batch utuh (bukan pecahan resep). */
+export function hitungKgBisaDiproduksi(items: KomponenStok[]) {
+  const maxBatch = maxBatchDariStok(items);
+  if (maxBatch <= 0) return 0;
+  return roundQty(maxBatch * totalKgResep(items));
+}
+
+export type KomponenProduksi = {
+  sumberId: string;
+  nama: string;
+  satuan?: string | null;
+  qtyPerBatch: QtyInput;
+  stok: QtyInput;
+  isiPerKarung?: QtyInput;
+};
+
+export type RencanaProduksiGabungan = {
+  jumlahBatch: number;
+  kgPerBatch: number;
+  kgHasil: number;
+  pemakaian: {
+    sumberId: string;
+    nama: string;
+    satuan: string;
+    qty: number;
+    stok: number;
+  }[];
+};
+
+/** Rencana buka karung: potong karung sesuai resep × batch, hasil ke stok gabungan (kg). */
+export function planProduksiGabungan(items: KomponenProduksi[], jumlahBatch: number): RencanaProduksiGabungan {
+  const batch = toQty(jumlahBatch);
+  if (!Number.isInteger(batch) || batch <= 0) {
+    throw new Error("Jumlah batch harus bilangan bulat minimal 1");
+  }
+  const cleaned = items.filter((item) => toQty(item.qtyPerBatch) > 0);
+  if (cleaned.length === 0) {
+    throw new Error("Produk gabungan belum punya komposisi");
+  }
+  const kgPerBatch = totalKgResep(cleaned);
+  if (kgPerBatch <= 0) {
+    throw new Error("Resep belum punya isi per karung");
+  }
+  return {
+    jumlahBatch: batch,
+    kgPerBatch,
+    kgHasil: roundQty(kgPerBatch * batch),
+    pemakaian: cleaned.map((k) => ({
+      sumberId: k.sumberId,
+      nama: k.nama,
+      satuan: k.satuan || "karung",
+      qty: roundQty(toQty(k.qtyPerBatch) * batch),
+      stok: toQty(k.stok),
+    })),
+  };
+}
+
 export function langkahKarung(current: unknown, arah: 1 | -1) {
   const n = toQty(current);
   const next = roundQty(Math.max(LANGKAH_KARUNG, n + arah * LANGKAH_KARUNG));

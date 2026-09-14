@@ -10,7 +10,7 @@ import {
   isKelipatanSetengahKarung,
   langkahKarung,
 } from "@/lib/gabungan";
-import { allowsFractionQty, formatQty, parseQtyInput, sanitizeQtyInput, toQty } from "@/lib/qty";
+import { allowsFractionQty, formatQty, hasEnoughStock, parseQtyInput, sanitizeQtyInput, toQty } from "@/lib/qty";
 import { CONTOH_CSV, parseTabelProduk, validateBarisImport, validateBarisSo } from "@/lib/import-tabel";
 import { SearchSelect } from "@/components/SearchSelect";
 
@@ -69,6 +69,7 @@ export default function ProdukPage() {
   const [formKomposisi, setFormKomposisi] = useState<{ sumberId: string; qtyPerBatch: string }[]>([]);
   const [bukaKarungId, setBukaKarungId] = useState<string | null>(null);
   const [bukaKarungEceranId, setBukaKarungEceranId] = useState("");
+  const [bukaKarungBatch, setBukaKarungBatch] = useState("1");
   const [bukaKarungMsg, setBukaKarungMsg] = useState("");
   const [bukaKarungErr, setBukaKarungErr] = useState("");
   const [bukaKarungSaving, setBukaKarungSaving] = useState(false);
@@ -102,6 +103,7 @@ export default function ProdukPage() {
     setShowImport(false);
     setSoMode(false);
     setError("");
+    setBukaKarungId(null);
     closeStock();
   }
   function openEdit(p: Product) {
@@ -115,11 +117,13 @@ export default function ProdukPage() {
     );
     setShowForm(true);
     setError("");
+    setBukaKarungId(null);
     closeStock();
   }
 
   function openStock(mode: StockMode, p: Product) {
     setShowForm(false);
+    setBukaKarungId(null);
     setStockMode(mode);
     setStockId(p.id);
     setStockJumlah("");
@@ -237,15 +241,20 @@ export default function ProdukPage() {
     fetchProduk();
   }
 
-  async function handleBukaKarung(karungId: string) {
+  async function handleBukaKarung(productId: string) {
     setBukaKarungErr("");
     setBukaKarungMsg("");
     setBukaKarungSaving(true);
+    const target = produk.find((p) => p.id === productId);
     try {
+      const body =
+        target?.tipe === "GABUNGAN"
+          ? { gabunganId: productId, jumlahBatch: Math.max(1, Math.floor(Number(bukaKarungBatch) || 1)) }
+          : { karungId: productId, eceranId: bukaKarungEceranId || undefined };
       const res = await fetch("/api/produk/buka-karung", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ karungId, eceranId: bukaKarungEceranId || undefined }),
+        body: JSON.stringify(body),
       });
       const json = await res.json();
       if (!res.ok) {
@@ -573,19 +582,48 @@ export default function ProdukPage() {
           <button
             type="button"
             onClick={() => {
+              setShowForm(false);
+              closeStock();
               setBukaKarungId(p.id);
               setBukaKarungEceranId(p.eceranDariProduk?.[0]?.id || "");
+              setBukaKarungBatch("1");
               setBukaKarungErr("");
               setBukaKarungMsg("");
             }}
-            className="chip-action bg-blue-50 text-blue-700"
+            className="chip-action bg-blue-50 text-blue-700 dark:bg-blue-950/50 dark:text-blue-300"
           >
             Buka 1
           </button>
         )}
-        {p.tipe !== "GABUNGAN" && (
+        {p.tipe === "GABUNGAN" && (
+          <button
+            type="button"
+            onClick={() => {
+              setShowForm(false);
+              closeStock();
+              setBukaKarungId(p.id);
+              setBukaKarungEceranId("");
+              setBukaKarungBatch("1");
+              setBukaKarungErr("");
+              setBukaKarungMsg("");
+            }}
+            className="chip-action bg-purple-50 text-purple-700 dark:bg-purple-950/50 dark:text-purple-300"
+          >
+            Buka Karung
+          </button>
+        )}
+        {p.tipe === "GABUNGAN" ? (
           <>
-            <button type="button" onClick={() => openStock("adjust", p)} className="chip-action bg-amber-50 text-amber-800">
+            <button type="button" onClick={() => openStock("adjust", p)} className="chip-action bg-amber-50 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300">
+              SO
+            </button>
+            <button type="button" onClick={() => openStock("kurang", p)} className="chip-action bg-muted text-muted-foreground">
+              Kurangi
+            </button>
+          </>
+        ) : (
+          <>
+            <button type="button" onClick={() => openStock("adjust", p)} className="chip-action bg-amber-50 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300">
               SO
             </button>
             <button type="button" onClick={() => openStock("isi", p)} className="chip-action bg-primary-soft text-primary">
@@ -605,6 +643,160 @@ export default function ProdukPage() {
         <button type="button" onClick={() => handleDelete(p.id)} className="chip-action text-danger bg-danger-soft">
           Hapus
         </button>
+      </div>
+    );
+  }
+
+  function renderBukaKarungPanel() {
+    if (!bukaKarungId) return null;
+    const target = active.find((p) => p.id === bukaKarungId);
+    if (!target) return null;
+
+    if (target.tipe === "GABUNGAN") {
+      const batch = Math.max(1, Math.floor(Number(bukaKarungBatch) || 1));
+      const resep = target.komposisi || [];
+      const rows = resep.map((k) => {
+        const sumber = active.find((p) => p.id === k.sumberId);
+        const need = toQty(toQty(k.qtyPerBatch) * batch);
+        const stok = sumber ? toQty(sumber.stok) : toQty(k.stokSumber);
+        return {
+          ...k,
+          need,
+          stok,
+          cukup: hasEnoughStock(stok, need),
+        };
+      });
+      const kgPerBatch = toQty(target.totalKgResep);
+      const kgHasil = toQty(kgPerBatch * batch);
+      const allCukup = rows.length > 0 && rows.every((r) => r.cukup);
+      const maxBatch = target.maxBatchProduksi ?? 0;
+      return (
+        <div className="bg-purple-50 dark:bg-purple-950/30 border border-purple-200 dark:border-purple-800 rounded-xl p-4 space-y-3 shadow-sm">
+          <h3 className="font-semibold text-[15px] text-purple-950 dark:text-purple-100">Buka Karung · {target.nama}</h3>
+          <p className="text-sm text-purple-900 dark:text-purple-200">
+            Potong stok karung sesuai resep, tambah stok campuran. Stok karung utuh yang tidak dibuka tetap ada.
+          </p>
+          {resep.length === 0 ? (
+            <p className="text-sm text-danger font-medium">Resep kosong. Edit produk dulu.</p>
+          ) : (
+            <>
+              <p className="text-sm text-purple-900 dark:text-purple-200">
+                1 batch: {resep.map((k) => `${k.sumberNama} ${formatKarungQty(k.qtyPerBatch)}`).join(" + ")}
+                {kgPerBatch > 0 ? ` → ${formatQty(kgPerBatch)} kg` : ""}
+              </p>
+              <div>
+                <label className="block text-sm font-medium mb-1 text-purple-950 dark:text-purple-100">Jumlah batch</label>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setBukaKarungBatch(String(Math.max(1, batch - 1)))}
+                    className="w-10 h-10 rounded-lg border border-purple-300 dark:border-purple-700 bg-white dark:bg-zinc-900 text-lg font-bold"
+                    aria-label="Kurangi batch"
+                  >
+                    −
+                  </button>
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    value={bukaKarungBatch}
+                    onChange={(e) => setBukaKarungBatch(digitsOnly(e.target.value) || "1")}
+                    className="w-16 px-2 py-2.5 border border-purple-300 dark:border-purple-700 rounded-lg font-mono text-center bg-white dark:bg-zinc-900"
+                    aria-label="Jumlah batch"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setBukaKarungBatch(String(batch + 1))}
+                    className="w-10 h-10 rounded-lg border border-purple-300 dark:border-purple-700 bg-white dark:bg-zinc-900 text-lg font-bold"
+                    aria-label="Tambah batch"
+                  >
+                    +
+                  </button>
+                  <span className="text-xs text-purple-800 dark:text-purple-300">
+                    stok sekarang {formatQty(stockValue(target))} kg
+                    {maxBatch > 0 ? ` · max ${maxBatch} batch` : ""}
+                  </span>
+                </div>
+              </div>
+              <ul className="text-sm space-y-1">
+                {rows.map((r) => (
+                  <li
+                    key={r.sumberId}
+                    className={r.cukup ? "text-purple-900 dark:text-purple-200" : "text-danger font-medium"}
+                  >
+                    {r.sumberNama}: −{formatKarungQty(r.need)} karung (sisa {formatQty(r.stok)}
+                    {r.cukup ? "" : " — tidak cukup"})
+                  </li>
+                ))}
+              </ul>
+              <p className="text-sm font-semibold text-purple-950 dark:text-purple-100">
+                Hasil: +{formatQty(kgHasil)} kg ke {target.nama}
+                {kgHasil > 0 ? ` → ${formatQty(toQty(stockValue(target) + kgHasil))} kg` : ""}
+              </p>
+            </>
+          )}
+          {bukaKarungErr && <p className="text-danger text-sm font-medium">{bukaKarungErr}</p>}
+          {bukaKarungMsg && <p className="text-primary text-sm font-medium">{bukaKarungMsg}</p>}
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={async () => { await handleBukaKarung(bukaKarungId); }}
+              disabled={bukaKarungSaving || resep.length === 0 || !allCukup}
+              className="flex-1 bg-purple-700 dark:bg-purple-600 text-white py-3 rounded-lg font-semibold disabled:opacity-50"
+            >
+              {bukaKarungSaving ? "Membuka..." : `Ya, Buka ${batch} Batch`}
+            </button>
+            <button
+              type="button"
+              onClick={() => { setBukaKarungId(null); setBukaKarungEceranId(""); setBukaKarungBatch("1"); setBukaKarungMsg(""); setBukaKarungErr(""); }}
+              className="px-5 py-3 border border-purple-300 dark:border-purple-700 rounded-lg text-purple-900 dark:text-purple-100 font-medium bg-white dark:bg-zinc-900"
+            >Batal</button>
+          </div>
+        </div>
+      );
+    }
+
+    const karung = target;
+    const eceranList = karung.eceranDariProduk || [];
+    const tujuan = eceranList.find((e) => e.id === bukaKarungEceranId) || eceranList[0];
+    return (
+      <div className="bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 rounded-xl p-4 space-y-3 shadow-sm">
+        <h3 className="font-semibold text-[15px] text-blue-950 dark:text-blue-100">Buka 1 Karung</h3>
+        <p className="text-sm text-blue-900 dark:text-blue-200">
+          Buka 1 <strong>{karung.nama}</strong> (stok: {formatQty(karung.stok)} karung) → tambah {karung.isiPerKarung ? formatQty(karung.isiPerKarung) : "25"} kg ke eceran tujuan.
+        </p>
+        {eceranList.length === 0 ? (
+          <p className="text-sm text-danger font-medium">Belum ada produk eceran tertaut. Buat produk eceran dulu.</p>
+        ) : eceranList.length === 1 ? (
+          <p className="text-sm text-blue-900 dark:text-blue-200">Tujuan: <strong>{tujuan?.nama}</strong></p>
+        ) : (
+          <div>
+            <label className="block text-sm font-medium mb-1 text-blue-950 dark:text-blue-100">Pilih eceran tujuan</label>
+            <SearchSelect
+              value={bukaKarungEceranId || tujuan?.id || ""}
+              onChange={setBukaKarungEceranId}
+              allowClear={false}
+              placeholder="Pilih eceran..."
+              options={eceranList.map((e) => ({ value: e.id, label: e.nama }))}
+            />
+          </div>
+        )}
+        {bukaKarungErr && <p className="text-danger text-sm font-medium">{bukaKarungErr}</p>}
+        {bukaKarungMsg && <p className="text-primary text-sm font-medium">{bukaKarungMsg}</p>}
+        <div className="flex gap-2">
+          <button
+            type="button"
+            onClick={async () => { await handleBukaKarung(bukaKarungId); }}
+            disabled={bukaKarungSaving || eceranList.length === 0}
+            className="flex-1 bg-blue-600 text-white py-3 rounded-lg font-semibold disabled:opacity-50"
+          >
+            {bukaKarungSaving ? "Membuka..." : "Ya, Buka 1 Karung"}
+          </button>
+          <button
+            type="button"
+            onClick={() => { setBukaKarungId(null); setBukaKarungEceranId(""); setBukaKarungBatch("1"); setBukaKarungMsg(""); setBukaKarungErr(""); }}
+            className="px-5 py-3 border border-blue-300 dark:border-blue-700 rounded-lg text-blue-900 dark:text-blue-100 font-medium bg-white dark:bg-zinc-900"
+          >Batal</button>
+        </div>
       </div>
     );
   }
@@ -791,7 +983,7 @@ export default function ProdukPage() {
               {([
                 { value: "KARUNG" as TipeProduk, label: "Karungan", desc: "Stok karung" },
                 { value: "ECERAN" as TipeProduk, label: "Eceran/Kg", desc: "Stok kg" },
-                { value: "GABUNGAN" as TipeProduk, label: "Gabungan", desc: "Resep karung" },
+                { value: "GABUNGAN" as TipeProduk, label: "Gabungan", desc: "Campuran kg" },
               ]).map((t) => (
                 <button
                   key={t.value}
@@ -874,8 +1066,11 @@ export default function ProdukPage() {
                   Modal {formatRupiah(hppGabunganPreview.totalBiaya)} ÷ {formatQty(hppGabunganPreview.totalKg)} kg
                 </p>
               )}
-              <p className="text-[11px] text-purple-700/80">
+              <p className="text-[11px] text-purple-700/80 dark:text-purple-300/80">
                 Campuran kelipatan ½ karung. Contoh: A 1 + B 1 + C ½ karung (25 kg) = 62,5 kg → Rp 250.000 / 62,5 kg.
+              </p>
+              <p className="text-[11px] text-purple-800 dark:text-purple-200">
+                Simpan resep saja — stok karung tidak berkurang. Stok campuran bertambah saat <strong>Buka Karung</strong>.
               </p>
             </div>
           )}
@@ -919,7 +1114,7 @@ export default function ProdukPage() {
           {formTipe === "GABUNGAN" && (
             <div>
               <label className="block text-sm font-medium mb-1">Resep Campuran</label>
-              <p className="text-[11px] text-muted-foreground mb-2">Pilih beras karung + jumlah (kelipatan ½ karung)</p>
+              <p className="text-[11px] text-muted-foreground mb-2">Pilih beras karung + jumlah (kelipatan ½ karung). Ini formula, bukan pemakaian stok.</p>
               <div className="space-y-2">
                 {formKomposisi.map((k, i) => {
                   const sumber = karungList.find((kr) => kr.id === k.sumberId);
@@ -1241,6 +1436,8 @@ export default function ProdukPage() {
         </div>
       )}
 
+      {renderBukaKarungPanel()}
+
       {loading ? (
         <div className="text-center py-10">
           <div className="inline-block w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
@@ -1297,6 +1494,11 @@ export default function ProdukPage() {
                       <p className={`font-mono font-bold ${stok <= 0 ? "text-danger" : stok < 10 ? "text-warning" : "text-primary"}`}>
                         {formatQty(stok)} {p.satuan}
                       </p>
+                      {p.tipe === "GABUNGAN" && (p.maxBatchProduksi ?? 0) > 0 && (
+                        <p className="text-[10px] text-purple-700 dark:text-purple-300">
+                          bisa {p.maxBatchProduksi} batch
+                        </p>
+                      )}
                     </div>
                   </div>
                   {soMode ? (
@@ -1381,10 +1583,13 @@ export default function ProdukPage() {
                         <td className="px-3 py-2.5 text-muted-foreground">{p.satuan}</td>
                         <td className="px-3 py-2.5 text-right font-mono">{formatRupiah(p.hargaJual)}</td>
                         <td className={`px-3 py-2.5 text-right font-mono font-bold ${stok <= 0 ? "text-danger" : stok < 10 ? "text-warning" : "text-primary"}`}>
-                          {p.tipe === "GABUNGAN" && p.stokGabungan != null ? (
-                            <span title="Stok dihitung dari komponen resep">{formatQty(p.stokGabungan)}</span>
-                          ) : (
-                            formatQty(p.stok)
+                          <span title={p.tipe === "GABUNGAN" ? "Stok campuran siap jual (independen dari karung)" : undefined}>
+                            {formatQty(stok)}
+                          </span>
+                          {p.tipe === "GABUNGAN" && (p.maxBatchProduksi ?? 0) > 0 && (
+                            <p className="text-[10px] font-medium text-purple-700 dark:text-purple-300">
+                              bisa {p.maxBatchProduksi} batch
+                            </p>
                           )}
                         </td>
                         {soMode ? (
@@ -1419,55 +1624,6 @@ export default function ProdukPage() {
           </div>
         </>
       )}
-
-      {/* Buka Karung confirmation */}
-      {bukaKarungId && (() => {
-        const karung = active.find((p) => p.id === bukaKarungId);
-        if (!karung) return null;
-        const eceranList = karung.eceranDariProduk || [];
-        const tujuan = eceranList.find((e) => e.id === bukaKarungEceranId) || eceranList[0];
-        return (
-          <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 space-y-3 shadow-sm">
-            <h3 className="font-semibold text-[15px] text-blue-950">Buka 1 Karung</h3>
-            <p className="text-sm text-blue-900">
-              Buka 1 <strong>{karung.nama}</strong> (stok: {formatQty(karung.stok)} karung) → tambah {karung.isiPerKarung ? formatQty(karung.isiPerKarung) : "25"} kg ke eceran tujuan.
-            </p>
-            {eceranList.length === 0 ? (
-              <p className="text-sm text-danger font-medium">Belum ada produk eceran tertaut. Buat produk eceran dulu.</p>
-            ) : eceranList.length === 1 ? (
-              <p className="text-sm text-blue-900">Tujuan: <strong>{tujuan?.nama}</strong></p>
-            ) : (
-              <div>
-                <label className="block text-sm font-medium mb-1 text-blue-950">Pilih eceran tujuan</label>
-                <SearchSelect
-                  value={bukaKarungEceranId || tujuan?.id || ""}
-                  onChange={setBukaKarungEceranId}
-                  allowClear={false}
-                  placeholder="Pilih eceran..."
-                  options={eceranList.map((e) => ({ value: e.id, label: e.nama }))}
-                />
-              </div>
-            )}
-            {bukaKarungErr && <p className="text-danger text-sm font-medium">{bukaKarungErr}</p>}
-            {bukaKarungMsg && <p className="text-primary text-sm font-medium">{bukaKarungMsg}</p>}
-            <div className="flex gap-2">
-              <button
-                type="button"
-                onClick={async () => { await handleBukaKarung(bukaKarungId); }}
-                disabled={bukaKarungSaving || eceranList.length === 0}
-                className="flex-1 bg-blue-600 text-white py-3 rounded-lg font-semibold disabled:opacity-50"
-              >
-                {bukaKarungSaving ? "Membuka..." : "Ya, Buka 1 Karung"}
-              </button>
-              <button
-                type="button"
-                onClick={() => { setBukaKarungId(null); setBukaKarungEceranId(""); setBukaKarungMsg(""); setBukaKarungErr(""); }}
-                className="px-5 py-3 border border-blue-300 rounded-lg text-blue-900 font-medium bg-white"
-              >Batal</button>
-            </div>
-          </div>
-        );
-      })()}
 
       <div className="space-y-2.5">
         <div className="flex items-end justify-between gap-3">

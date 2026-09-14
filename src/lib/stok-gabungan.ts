@@ -1,5 +1,5 @@
 import { Prisma, PrismaClient } from "@prisma/client";
-import { totalKgResep } from "@/lib/gabungan";
+import { hitungHppGabungan, planProduksiGabungan } from "@/lib/gabungan";
 import { hasEnoughStock, toQty } from "@/lib/qty";
 
 type DbClient = PrismaClient | Prisma.TransactionClient;
@@ -9,7 +9,7 @@ export type ProdukStokMeta = {
   nama: string;
   satuan: string;
   tipe: string;
-  komposisiResep: {
+  komposisiResep?: {
     sumberId: string;
     qtyPerBatch: Prisma.Decimal | number | string;
     sumber?: { id: string; nama: string; satuan: string | null; isiPerKarung?: Prisma.Decimal | number | string | null };
@@ -23,48 +23,21 @@ export type StokDelta = {
   satuan: string;
 };
 
-/** Ubah qty produk menjadi delta stok fisik (GABUNGAN → komponen). */
+/**
+ * Ubah qty produk menjadi delta stok.
+ * Karung, eceran, dan gabungan punya stok masing-masing — penjualan tidak
+ * merambat ke produk lain. Pemindahan karung → gabungan hanya lewat buka karung.
+ */
 export function expandStokDelta(meta: ProdukStokMeta, qtyDelta: number): StokDelta[] {
   const qty = toQty(qtyDelta);
   if (qty === 0) return [];
-
-  if (meta.tipe === "GABUNGAN") {
-    if (!meta.komposisiResep.length) {
-      throw new Error(`STOK:${meta.nama} belum punya komposisi`);
-    }
-    const totalKg = totalKgResep(
-      meta.komposisiResep.map((k) => ({
-        qtyPerBatch: k.qtyPerBatch,
-        isiPerKarung: k.sumber?.isiPerKarung,
-      })),
-    );
-    if (totalKg <= 0) {
-      throw new Error(`STOK:${meta.nama} resep belum punya isi per karung`);
-    }
-    // qty = kg terjual; potong karung proporsional terhadap total kg resep.
-    const rasio = qty / totalKg;
-    const sourceDeltas = meta.komposisiResep.map((k) => ({
-      produkId: k.sumberId,
-      delta: toQty(rasio * toQty(k.qtyPerBatch)),
-      nama: k.sumber?.nama || meta.nama,
-      satuan: k.sumber?.satuan || "",
-    }));
-    // Stok GABUNGAN independen — potong juga stok gabungan itu sendiri
-    sourceDeltas.push({
-      produkId: meta.id,
-      delta: qty,
-      nama: meta.nama,
-      satuan: "kg",
-    });
-    return sourceDeltas;
-  }
 
   return [
     {
       produkId: meta.id,
       delta: qty,
       nama: meta.nama,
-      satuan: meta.satuan || "",
+      satuan: meta.tipe === "GABUNGAN" ? "kg" : meta.satuan || "",
     },
   ];
 }
@@ -123,15 +96,95 @@ export async function loadProdukStokMeta(tx: DbClient, ids: string[]) {
       nama: true,
       satuan: true,
       tipe: true,
+    },
+  });
+
+  return new Map(list.map((p) => [p.id, p as ProdukStokMeta]));
+}
+
+export async function applyProduksiGabungan(tx: DbClient, gabunganId: string, jumlahBatch: number) {
+  const gabungan = await tx.produk.findUnique({
+    where: { id: gabunganId },
+    include: {
       komposisiResep: {
-        select: {
-          sumberId: true,
-          qtyPerBatch: true,
-          sumber: { select: { id: true, nama: true, satuan: true, isiPerKarung: true } },
+        include: {
+          sumber: {
+            select: {
+              id: true,
+              nama: true,
+              satuan: true,
+              stok: true,
+              isiPerKarung: true,
+              hargaBeli: true,
+              hppRataRata: true,
+            },
+          },
         },
       },
     },
   });
 
-  return new Map(list.map((p) => [p.id, p as ProdukStokMeta]));
+  if (!gabungan || !gabungan.aktif) {
+    throw new Error("Produk tidak ditemukan");
+  }
+  if (gabungan.tipe !== "GABUNGAN") {
+    throw new Error("Produk bukan tipe gabungan");
+  }
+  if (!gabungan.komposisiResep.length) {
+    throw new Error("Produk gabungan belum punya komposisi");
+  }
+
+  const items = gabungan.komposisiResep.map((k) => ({
+    sumberId: k.sumberId,
+    nama: k.sumber.nama,
+    satuan: k.sumber.satuan,
+    qtyPerBatch: k.qtyPerBatch,
+    stok: k.sumber.stok,
+    isiPerKarung: k.sumber.isiPerKarung,
+    hargaBeli: k.sumber.hargaBeli,
+    hppRataRata: k.sumber.hppRataRata,
+  }));
+
+  const plan = planProduksiGabungan(items, jumlahBatch);
+  const hpp = hitungHppGabungan(items);
+  if (!hpp.hppPerKg || hpp.hppPerKg <= 0) {
+    throw new Error("HPP dari resep tidak valid — cek harga beli dan isi per karung komponen");
+  }
+
+  const deltas: StokDelta[] = [
+    ...plan.pemakaian.map((p) => ({
+      produkId: p.sumberId,
+      delta: -p.qty,
+      nama: p.nama,
+      satuan: p.satuan,
+    })),
+    {
+      produkId: gabungan.id,
+      delta: plan.kgHasil,
+      nama: gabungan.nama,
+      satuan: "kg",
+    },
+  ];
+  await applyStokDeltas(tx, deltas, { checkStock: true });
+
+  const stokLama = toQty(gabungan.stok);
+  const stokBaru = toQty(stokLama + plan.kgHasil);
+  const hppBaru =
+    stokLama > 0
+      ? Math.round((stokLama * (gabungan.hppRataRata || gabungan.hargaBeli) + plan.kgHasil * hpp.hppPerKg) / stokBaru)
+      : hpp.hppPerKg;
+
+  await tx.produk.update({
+    where: { id: gabungan.id },
+    data: { hppRataRata: hppBaru, hargaBeli: hpp.hppPerKg },
+  });
+
+  return {
+    ...plan,
+    hppPerKg: hpp.hppPerKg,
+    hppRataRata: hppBaru,
+    stokGabunganLama: stokLama,
+    stokGabunganBaru: stokBaru,
+    nama: gabungan.nama,
+  };
 }

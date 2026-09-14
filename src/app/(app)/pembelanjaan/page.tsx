@@ -160,7 +160,9 @@ export default function PembelanjaanPage() {
                   value={form.produkId}
                   required
                   placeholder="Cari produk..."
-                  options={produkList.map((p) => ({
+                  options={produkList
+                    .filter((p) => p.tipe !== "GABUNGAN")
+                    .map((p) => ({
                     value: p.id,
                     label: p.nama,
                     description: `stok ${formatQty(p.stok)} ${p.satuan}`,
@@ -176,7 +178,7 @@ export default function PembelanjaanPage() {
                   }}
                 />
               )}
-              <p className="text-[11px] text-muted-foreground mt-1">Restock otomatis menambah stok produk. Tidak perlu Isi Stok lagi di menu Produk untuk belanja yang sama.</p>
+              <p className="text-[11px] text-muted-foreground mt-1">Restock otomatis menambah stok karung/eceran. Produk gabungan diisi lewat Buka Karung di menu Produk.</p>
             </div>
           ) : (
             <div className="relative">

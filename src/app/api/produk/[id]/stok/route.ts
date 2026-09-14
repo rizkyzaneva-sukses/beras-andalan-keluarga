@@ -22,6 +22,12 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   if (!["tambah", "kurang"].includes(arah) || !isValidQty(jumlah, { allowFraction: allowsFractionQty(produk) })) {
     return NextResponse.json({ error: "Jumlah stok tidak valid" }, { status: 400 });
   }
+  if (produk.tipe === "GABUNGAN" && arah === "tambah") {
+    return NextResponse.json(
+      { error: "Stok gabungan ditambah lewat Buka Karung, bukan Isi Stok" },
+      { status: 400 },
+    );
+  }
 
   const stokLama = toQty(produk.stok);
   if (arah === "kurang" && !hasEnoughStock(stokLama, jumlah)) {

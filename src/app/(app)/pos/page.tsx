@@ -115,7 +115,7 @@ export default function PosPage() {
       return `Stok eceran ${product.nama} habis — buka karung ${product.sumberProdukNama} dulu di menu Produk`;
     }
     if (product.tipe === "GABUNGAN") {
-      return `Stok ${product.nama} habis — komponen resep tidak cukup`;
+      return `Stok ${product.nama} habis — buka karung resep dulu di menu Produk`;
     }
     return `Stok ${product.nama} habis`;
   };

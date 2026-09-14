@@ -92,7 +92,7 @@ export function hasEnoughStock(stok: unknown, need: unknown) {
   return toQty(stok) + 1 / (QTY_FACTOR * 2) >= toQty(need);
 }
 
-/** Stok yang boleh dijual di POS: GABUNGAN pakai stokGabungan, selain itu stok DB. */
+/** Stok yang boleh dijual di POS. Gabungan = stok campuran sendiri, bukan stok karung resep. */
 export function availableStok(product: {
   stok?: unknown;
   tipe?: string | null;

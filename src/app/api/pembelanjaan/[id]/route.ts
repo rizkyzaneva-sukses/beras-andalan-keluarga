@@ -20,6 +20,12 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
   const linkedProduk = linkedId
     ? await prisma.produk.findUnique({ where: { id: linkedId }, select: { nama: true, tipe: true, satuan: true } })
     : null;
+  if (kategori === "RESTOCK" && linkedProduk?.tipe === "GABUNGAN") {
+    return NextResponse.json(
+      { error: "Produk gabungan tidak di-restock lewat belanja. Buka karung di menu Produk." },
+      { status: 400 },
+    );
+  }
   const allowFraction = allowsFractionQty(linkedProduk || { nama: namaBarang });
   if (
     !isValidQty(jumlah, { allowFraction }) ||

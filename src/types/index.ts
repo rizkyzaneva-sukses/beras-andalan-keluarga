@@ -9,6 +9,7 @@ export interface KomposisiItem {
   sumberNama: string;
   qtyPerBatch: number;
   isiPerKarung?: number | null;
+  stokSumber?: number | null;
 }
 
 export interface Product {
@@ -27,6 +28,8 @@ export interface Product {
   komposisi?: KomposisiItem[];
   stokGabungan?: number | null;
   totalKgResep?: number | null;
+  stokBisaDiproduksi?: number | null;
+  maxBatchProduksi?: number | null;
   eceranDariProduk?: { id: string; nama: string }[];
 }
 
