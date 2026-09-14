@@ -205,7 +205,7 @@ export default function PanduanPage() {
               <ul className="space-y-1.5 text-sm text-muted-foreground list-disc pl-5">
                 <li>Isi <strong>Isi per Karung</strong> (mis. 25 kg per karung).</li>
                 <li>Tombol <strong>Buka 1</strong> — buka 1 karung, stok eceran otomatis bertambah sesuai isi per karung.</li>
-                <li>Tombol <strong>Isi</strong> untuk menambah stok karung, <strong>Kurangi</strong> untuk mengurangi (rusak/sampel).</li>
+                <li>Tombol <strong>⋯</strong> untuk Isi, Kurangi, Pindah, Stock Opname, Edit, atau Hapus.</li>
               </ul>
             </div>
             <div>
@@ -222,7 +222,7 @@ export default function PanduanPage() {
                 <li>Resep dari produk <strong>karung</strong>, jumlahnya kelipatan <strong>½ karung</strong> atau 1 karung (0,5 / 1 / 1,5 / 2 …).</li>
                 <li>HPP per kg = total modal resep ÷ total kg. Contoh: A 1 + B 1 + C ½ karung, masing-masing Rp 100.000 / 25 kg → 62,5 kg, modal Rp 250.000, HPP Rp 4.000/kg.</li>
                 <li><strong>Buat data produk</strong> hanya menyimpan resep — stok karung tidak berkurang, stok gabungan mulai dari 0.</li>
-                <li>Isi stok di menu Produk, tombol <strong>Isi Stok</strong> — bukan di Pengeluaran. Memotong karung sesuai resep dan menambah kg campuran. Bisa diulang.</li>
+                <li>Isi stok di menu Produk, tombol <strong>Isi Stok</strong> — bukan di Pengeluaran. Aksi lain (SO, Kurangi, Edit) di tombol <strong>⋯</strong>.</li>
                 <li>Stok karung dan stok gabungan <strong>independen</strong>. Jual karung utuh tidak mengurangi gabungan; jual gabungan tidak mengurangi karung.</li>
               </ul>
             </div>

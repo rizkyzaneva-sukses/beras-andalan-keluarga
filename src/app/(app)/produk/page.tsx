@@ -73,6 +73,7 @@ export default function ProdukPage() {
   const [bukaKarungMsg, setBukaKarungMsg] = useState("");
   const [bukaKarungErr, setBukaKarungErr] = useState("");
   const [bukaKarungSaving, setBukaKarungSaving] = useState(false);
+  const [aksiId, setAksiId] = useState<string | null>(null);
 
   async function fetchProduk() {
     const res = await fetch("/api/produk");
@@ -104,6 +105,7 @@ export default function ProdukPage() {
     setSoMode(false);
     setError("");
     setBukaKarungId(null);
+    setAksiId(null);
     closeStock();
   }
   function openEdit(p: Product) {
@@ -118,12 +120,14 @@ export default function ProdukPage() {
     setShowForm(true);
     setError("");
     setBukaKarungId(null);
+    setAksiId(null);
     closeStock();
   }
 
   function openStock(mode: StockMode, p: Product) {
     setShowForm(false);
     setBukaKarungId(null);
+    setAksiId(null);
     setStockMode(mode);
     setStockId(p.id);
     setStockJumlah("");
@@ -276,6 +280,16 @@ export default function ProdukPage() {
   );
   const pindahTujuanSelected = tujuanList.find((p) => p.id === pindahKe) || null;
   const karungList = active.filter((p) => p.tipe === "KARUNG");
+  const aksiProduk = aksiId ? active.find((p) => p.id === aksiId) || null : null;
+
+  useEffect(() => {
+    if (!aksiId) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setAksiId(null);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [aksiId]);
 
   useEffect(() => {
     tujuanListRef.current = tujuanList;
@@ -583,73 +597,38 @@ export default function ProdukPage() {
     return "";
   }
 
+  function openBukaKarung(p: Product) {
+    setShowForm(false);
+    closeStock();
+    setAksiId(null);
+    setBukaKarungId(p.id);
+    setBukaKarungEceranId(p.tipe === "KARUNG" ? p.eceranDariProduk?.[0]?.id || "" : "");
+    setBukaKarungBatch("1");
+    setBukaKarungErr("");
+    setBukaKarungMsg("");
+  }
+
   function ProductActions({ p }: { p: Product }) {
+    const primary =
+      p.tipe === "KARUNG"
+        ? { label: "Buka 1", className: "bg-blue-50 text-blue-700 dark:bg-blue-950/50 dark:text-blue-300", run: () => openBukaKarung(p) }
+        : p.tipe === "GABUNGAN"
+          ? { label: "Isi Stok", className: "bg-purple-50 text-purple-700 dark:bg-purple-950/50 dark:text-purple-300", run: () => openBukaKarung(p) }
+          : { label: "Isi", className: "bg-primary-soft text-primary", run: () => openStock("isi", p) };
     return (
-      <div className="flex flex-wrap gap-1.5">
-        {p.tipe === "KARUNG" && (
-          <button
-            type="button"
-            onClick={() => {
-              setShowForm(false);
-              closeStock();
-              setBukaKarungId(p.id);
-              setBukaKarungEceranId(p.eceranDariProduk?.[0]?.id || "");
-              setBukaKarungBatch("1");
-              setBukaKarungErr("");
-              setBukaKarungMsg("");
-            }}
-            className="chip-action bg-blue-50 text-blue-700 dark:bg-blue-950/50 dark:text-blue-300"
-          >
-            Buka 1
-          </button>
-        )}
-        {p.tipe === "GABUNGAN" && (
-          <button
-            type="button"
-            onClick={() => {
-              setShowForm(false);
-              closeStock();
-              setBukaKarungId(p.id);
-              setBukaKarungEceranId("");
-              setBukaKarungBatch("1");
-              setBukaKarungErr("");
-              setBukaKarungMsg("");
-            }}
-            className="chip-action bg-purple-50 text-purple-700 dark:bg-purple-950/50 dark:text-purple-300"
-          >
-            Isi Stok
-          </button>
-        )}
-        {p.tipe === "GABUNGAN" ? (
-          <>
-            <button type="button" onClick={() => openStock("adjust", p)} className="chip-action bg-amber-50 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300">
-              SO
-            </button>
-            <button type="button" onClick={() => openStock("kurang", p)} className="chip-action bg-muted text-muted-foreground">
-              Kurangi
-            </button>
-          </>
-        ) : (
-          <>
-            <button type="button" onClick={() => openStock("adjust", p)} className="chip-action bg-amber-50 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300">
-              SO
-            </button>
-            <button type="button" onClick={() => openStock("isi", p)} className="chip-action bg-primary-soft text-primary">
-              Isi
-            </button>
-            <button type="button" onClick={() => openStock("kurang", p)} className="chip-action bg-muted text-muted-foreground">
-              Kurangi
-            </button>
-            <button type="button" onClick={() => openStock("pindah", p)} className="chip-action bg-muted text-muted-foreground">
-              Pindah
-            </button>
-          </>
-        )}
-        <button type="button" onClick={() => openEdit(p)} className="chip-action text-primary bg-primary-soft/50">
-          Edit
+      <div className="flex items-center gap-1.5 w-full md:w-auto">
+        <button type="button" onClick={primary.run} className={`chip-action flex-1 md:flex-none ${primary.className}`}>
+          {primary.label}
         </button>
-        <button type="button" onClick={() => handleDelete(p.id)} className="chip-action text-danger bg-danger-soft">
-          Hapus
+        <button
+          type="button"
+          onClick={() => setAksiId(p.id)}
+          className="chip-action shrink-0 min-w-11 px-0 bg-muted text-foreground"
+          aria-label={`Aksi lain ${p.nama}`}
+          aria-haspopup="dialog"
+          aria-expanded={aksiId === p.id}
+        >
+          ⋯
         </button>
       </div>
     );
@@ -823,6 +802,7 @@ export default function ProdukPage() {
               setShowImport((v) => !v);
               setShowForm(false);
               setSoMode(false);
+              setAksiId(null);
               closeStock();
             }}
             className="px-3 py-2.5 rounded-lg text-sm font-semibold border border-border bg-surface"
@@ -837,6 +817,7 @@ export default function ProdukPage() {
               setShowImport(false);
               setSoError("");
               setSoMsg("");
+              setAksiId(null);
               closeStock();
             }}
             className={`px-3 py-2.5 rounded-lg text-sm font-semibold ${soMode ? "bg-amber-600 text-white" : "bg-amber-50 text-amber-900 border border-amber-200"}`}
@@ -1445,6 +1426,111 @@ export default function ProdukPage() {
       )}
 
       {renderBukaKarungPanel()}
+
+      {aksiProduk && (
+        <div className="fixed inset-0 z-50">
+          <button
+            type="button"
+            className="absolute inset-0 bg-black/45 dark:bg-black/60"
+            onClick={() => setAksiId(null)}
+            aria-label="Tutup aksi"
+          />
+          <div
+            role="dialog"
+            aria-label={`Aksi ${aksiProduk.nama}`}
+            className="absolute bottom-0 inset-x-0 md:inset-x-auto md:right-4 md:bottom-4 md:w-[360px] bg-surface text-foreground rounded-t-3xl md:rounded-2xl shadow-lg border border-border safe-pb max-h-[78dvh] overflow-y-auto"
+          >
+            <div className="flex justify-center pt-3 pb-1 md:hidden">
+              <div className="w-10 h-1 rounded-full bg-border" />
+            </div>
+            <div className="px-4 pt-1 pb-2 flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <p className="font-semibold text-[15px] truncate">{aksiProduk.nama}</p>
+                <p className="text-xs text-muted-foreground">
+                  {aksiProduk.tipe === "KARUNG" ? "Karungan" : aksiProduk.tipe === "ECERAN" ? "Eceran" : "Gabungan"}
+                  {" · "}
+                  stok {formatQty(stockValue(aksiProduk))} {aksiProduk.satuan}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setAksiId(null)}
+                className="chip-action min-w-11 px-0 bg-muted text-muted-foreground"
+                aria-label="Tutup"
+              >
+                ×
+              </button>
+            </div>
+            <div className="px-3 pb-4 space-y-3">
+              <div>
+                <p className="px-1 pb-1 text-[10px] font-bold uppercase tracking-wide text-muted-foreground">Stok</p>
+                <div className="rounded-xl border border-border overflow-hidden divide-y divide-border">
+                  {aksiProduk.tipe !== "GABUNGAN" && aksiProduk.tipe !== "ECERAN" && (
+                    <button
+                      type="button"
+                      onClick={() => openStock("isi", aksiProduk)}
+                      className="w-full min-h-11 px-3 py-2.5 text-left hover:bg-muted active:bg-muted"
+                    >
+                      <span className="block text-sm font-semibold">Isi</span>
+                      <span className="block text-[11px] text-muted-foreground">Tambah stok manual</span>
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => openStock("kurang", aksiProduk)}
+                    className="w-full min-h-11 px-3 py-2.5 text-left hover:bg-muted active:bg-muted"
+                  >
+                    <span className="block text-sm font-semibold">Kurangi</span>
+                    <span className="block text-[11px] text-muted-foreground">Rusak, sampel, atau koreksi</span>
+                  </button>
+                  {aksiProduk.tipe !== "GABUNGAN" && (
+                    <button
+                      type="button"
+                      onClick={() => openStock("pindah", aksiProduk)}
+                      className="w-full min-h-11 px-3 py-2.5 text-left hover:bg-muted active:bg-muted"
+                    >
+                      <span className="block text-sm font-semibold">Pindah</span>
+                      <span className="block text-[11px] text-muted-foreground">Pecah ke produk lain</span>
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => openStock("adjust", aksiProduk)}
+                    className="w-full min-h-11 px-3 py-2.5 text-left hover:bg-muted active:bg-muted"
+                  >
+                    <span className="block text-sm font-semibold">Stock Opname</span>
+                    <span className="block text-[11px] text-muted-foreground">Ganti stok ke angka fisik</span>
+                  </button>
+                </div>
+              </div>
+              <div>
+                <p className="px-1 pb-1 text-[10px] font-bold uppercase tracking-wide text-muted-foreground">Produk</p>
+                <div className="rounded-xl border border-border overflow-hidden divide-y divide-border">
+                  <button
+                    type="button"
+                    onClick={() => openEdit(aksiProduk)}
+                    className="w-full min-h-11 px-3 py-2.5 text-left hover:bg-muted active:bg-muted"
+                  >
+                    <span className="block text-sm font-semibold">Edit</span>
+                    <span className="block text-[11px] text-muted-foreground">Nama, harga, atau resep</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setAksiId(null);
+                      handleDelete(aksiProduk.id);
+                    }}
+                    className="w-full min-h-11 px-3 py-2.5 text-left hover:bg-red-50 dark:hover:bg-red-950/40"
+                  >
+                    <span className="block text-sm font-semibold text-danger">Hapus</span>
+                    <span className="block text-[11px] text-muted-foreground">Sembunyikan dari daftar</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {loading ? (
         <div className="text-center py-10">
